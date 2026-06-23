@@ -1,0 +1,913 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: StellarSwap DEX API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: tokens
+    description: Token operations
+  - name: pools
+    description: Liquidity pool operations
+  - name: swap
+    description: Token swap operations
+  - name: liquidity
+    description: Liquidity management
+  - name: market
+    description: Market data
+  - name: portfolio
+    description: User portfolio
+  - name: transactions
+    description: Transaction history
+  - name: stellar
+    description: On-chain Soroban contract operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /tokens:
+    get:
+      operationId: listTokens
+      tags: [tokens]
+      summary: List all supported tokens
+      responses:
+        "200":
+          description: Token list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Token"
+
+  /tokens/{id}:
+    get:
+      operationId: getToken
+      tags: [tokens]
+      summary: Get token details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Token details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Token"
+        "404":
+          description: Not found
+
+  /pools:
+    get:
+      operationId: listPools
+      tags: [pools]
+      summary: List all liquidity pools
+      parameters:
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [tvl, volume24h, apy]
+      responses:
+        "200":
+          description: Pool list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pool"
+    post:
+      operationId: createPool
+      tags: [pools]
+      summary: Create a new liquidity pool
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PoolInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pool"
+
+  /pools/{id}:
+    get:
+      operationId: getPool
+      tags: [pools]
+      summary: Get pool details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Pool details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pool"
+        "404":
+          description: Not found
+
+  /pools/{id}/liquidity:
+    post:
+      operationId: addLiquidity
+      tags: [liquidity]
+      summary: Add liquidity to a pool
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LiquidityInput"
+      responses:
+        "200":
+          description: Liquidity added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiquidityResult"
+    delete:
+      operationId: removeLiquidity
+      tags: [liquidity]
+      summary: Remove liquidity from a pool
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveLiquidityInput"
+      responses:
+        "200":
+          description: Liquidity removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiquidityResult"
+
+  /swap/quote:
+    get:
+      operationId: getSwapQuote
+      tags: [swap]
+      summary: Get a swap price quote
+      parameters:
+        - name: fromTokenId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: toTokenId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: amount
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: slippage
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Swap quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwapQuote"
+
+  /swap:
+    post:
+      operationId: executeSwap
+      tags: [swap]
+      summary: Execute a token swap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapInput"
+      responses:
+        "200":
+          description: Swap executed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwapResult"
+
+  /transactions:
+    get:
+      operationId: listTransactions
+      tags: [transactions]
+      summary: List recent transactions
+      parameters:
+        - name: walletAddress
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [swap, add_liquidity, remove_liquidity]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transactions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /market/stats:
+    get:
+      operationId: getMarketStats
+      tags: [market]
+      summary: Get overall market statistics
+      responses:
+        "200":
+          description: Market stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketStats"
+
+  /market/price-history:
+    get:
+      operationId: getPriceHistory
+      tags: [market]
+      summary: Get price history for a token pair
+      parameters:
+        - name: poolId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1h, 24h, 7d, 30d]
+      responses:
+        "200":
+          description: Price history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PricePoint"
+
+  /stellar/contracts:
+    get:
+      operationId: getStellarContracts
+      tags: [stellar]
+      summary: Get deployed Soroban contract addresses
+      responses:
+        "200":
+          description: Contract addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarContracts"
+
+  /stellar/swap:
+    post:
+      operationId: buildSwapTx
+      tags: [stellar]
+      summary: Build unsigned swap transaction XDR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StellarSwapInput"
+      responses:
+        "200":
+          description: Unsigned XDR or demo result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarTxResult"
+
+  /stellar/add-liquidity:
+    post:
+      operationId: buildAddLiquidityTx
+      tags: [stellar]
+      summary: Build unsigned add-liquidity transaction XDR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StellarAddLiquidityInput"
+      responses:
+        "200":
+          description: Unsigned XDR or demo result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarTxResult"
+
+  /stellar/remove-liquidity:
+    post:
+      operationId: buildRemoveLiquidityTx
+      tags: [stellar]
+      summary: Build unsigned remove-liquidity transaction XDR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StellarRemoveLiquidityInput"
+      responses:
+        "200":
+          description: Unsigned XDR or demo result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarTxResult"
+
+  /stellar/stake:
+    post:
+      operationId: buildStakeTx
+      tags: [stellar]
+      summary: Build unsigned stake-farm transaction XDR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StellarStakeInput"
+      responses:
+        "200":
+          description: Unsigned XDR or demo result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarTxResult"
+
+  /stellar/claim:
+    post:
+      operationId: buildClaimTx
+      tags: [stellar]
+      summary: Build unsigned claim-rewards transaction XDR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StellarClaimInput"
+      responses:
+        "200":
+          description: Unsigned XDR or demo result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarTxResult"
+
+  /stellar/limit-order:
+    post:
+      operationId: placeLimitOrder
+      tags: [stellar]
+      summary: Place a limit order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StellarLimitOrderInput"
+      responses:
+        "200":
+          description: Order placed (demo or on-chain)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StellarTxResult"
+
+  /stellar/pool-state:
+    get:
+      operationId: getOnChainPoolState
+      tags: [stellar]
+      summary: Get on-chain pool state from Soroban RPC
+      parameters:
+        - name: contract
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pool state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnChainPoolState"
+
+  /portfolio:
+    get:
+      operationId: getPortfolio
+      tags: [portfolio]
+      summary: Get user portfolio
+      parameters:
+        - name: walletAddress
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Portfolio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Portfolio"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Token:
+      type: object
+      required: [id, symbol, name, price, change24h, volume24h, logoUrl]
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        change24h:
+          type: number
+        volume24h:
+          type: number
+        logoUrl:
+          type: string
+        contractAddress:
+          type: ["string", "null"]
+        isNative:
+          type: boolean
+
+    Pool:
+      type: object
+      required: [id, tokenAId, tokenBId, tokenA, tokenB, reserveA, reserveB, totalLiquidity, volume24h, fees24h, apy, fee, lpTokenSupply]
+      properties:
+        id:
+          type: integer
+        tokenAId:
+          type: integer
+        tokenBId:
+          type: integer
+        tokenA:
+          $ref: "#/components/schemas/Token"
+        tokenB:
+          $ref: "#/components/schemas/Token"
+        reserveA:
+          type: number
+        reserveB:
+          type: number
+        totalLiquidity:
+          type: number
+        volume24h:
+          type: number
+        fees24h:
+          type: number
+        apy:
+          type: number
+        fee:
+          type: number
+        lpTokenSupply:
+          type: number
+
+    PoolInput:
+      type: object
+      required: [tokenAId, tokenBId, fee]
+      properties:
+        tokenAId:
+          type: integer
+        tokenBId:
+          type: integer
+        fee:
+          type: number
+
+    LiquidityInput:
+      type: object
+      required: [amountA, amountB, walletAddress]
+      properties:
+        amountA:
+          type: number
+        amountB:
+          type: number
+        walletAddress:
+          type: string
+
+    RemoveLiquidityInput:
+      type: object
+      required: [lpTokenAmount, walletAddress]
+      properties:
+        lpTokenAmount:
+          type: number
+        walletAddress:
+          type: string
+
+    LiquidityResult:
+      type: object
+      required: [success, txHash, lpTokenAmount, amountA, amountB]
+      properties:
+        success:
+          type: boolean
+        txHash:
+          type: string
+        lpTokenAmount:
+          type: number
+        amountA:
+          type: number
+        amountB:
+          type: number
+
+    SwapQuote:
+      type: object
+      required: [fromToken, toToken, inputAmount, outputAmount, priceImpact, fee, minimumReceived, executionPrice]
+      properties:
+        fromToken:
+          $ref: "#/components/schemas/Token"
+        toToken:
+          $ref: "#/components/schemas/Token"
+        inputAmount:
+          type: number
+        outputAmount:
+          type: number
+        priceImpact:
+          type: number
+        fee:
+          type: number
+        minimumReceived:
+          type: number
+        executionPrice:
+          type: number
+        route:
+          type: array
+          items:
+            type: string
+
+    SwapInput:
+      type: object
+      required: [fromTokenId, toTokenId, inputAmount, minOutputAmount, walletAddress]
+      properties:
+        fromTokenId:
+          type: integer
+        toTokenId:
+          type: integer
+        inputAmount:
+          type: number
+        minOutputAmount:
+          type: number
+        walletAddress:
+          type: string
+        slippage:
+          type: number
+
+    SwapResult:
+      type: object
+      required: [success, txHash, inputAmount, outputAmount, executionPrice, fee]
+      properties:
+        success:
+          type: boolean
+        txHash:
+          type: string
+        inputAmount:
+          type: number
+        outputAmount:
+          type: number
+        executionPrice:
+          type: number
+        fee:
+          type: number
+
+    Transaction:
+      type: object
+      required: [id, type, walletAddress, tokenASymbol, tokenBSymbol, amountA, amountB, txHash, timestamp, status]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [swap, add_liquidity, remove_liquidity]
+        walletAddress:
+          type: string
+        tokenASymbol:
+          type: string
+        tokenBSymbol:
+          type: string
+        amountA:
+          type: number
+        amountB:
+          type: number
+        txHash:
+          type: string
+        timestamp:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, failed]
+        valueUsd:
+          type: ["number", "null"]
+
+    MarketStats:
+      type: object
+      required: [totalTvl, volume24h, totalPools, totalTransactions24h, topPools, topTokens]
+      properties:
+        totalTvl:
+          type: number
+        volume24h:
+          type: number
+        totalPools:
+          type: integer
+        totalTransactions24h:
+          type: integer
+        tvlChange24h:
+          type: number
+        volumeChange24h:
+          type: number
+        topPools:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pool"
+        topTokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/Token"
+
+    PricePoint:
+      type: object
+      required: [timestamp, price, volume]
+      properties:
+        timestamp:
+          type: string
+        price:
+          type: number
+        volume:
+          type: number
+
+    Portfolio:
+      type: object
+      required: [walletAddress, totalValueUsd, tokenBalances, lpPositions, recentTransactions]
+      properties:
+        walletAddress:
+          type: string
+        totalValueUsd:
+          type: number
+        tokenBalances:
+          type: array
+          items:
+            $ref: "#/components/schemas/TokenBalance"
+        lpPositions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LpPosition"
+        recentTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+
+    TokenBalance:
+      type: object
+      required: [token, balance, valueUsd]
+      properties:
+        token:
+          $ref: "#/components/schemas/Token"
+        balance:
+          type: number
+        valueUsd:
+          type: number
+
+    LpPosition:
+      type: object
+      required: [pool, lpTokenBalance, sharePercent, valueUsd, feesEarned]
+      properties:
+        pool:
+          $ref: "#/components/schemas/Pool"
+        lpTokenBalance:
+          type: number
+        sharePercent:
+          type: number
+        valueUsd:
+          type: number
+        feesEarned:
+          type: number
+
+    StellarContracts:
+      type: object
+      properties:
+        factory:
+          type: ["string", "null"]
+        router:
+          type: ["string", "null"]
+        farm:
+          type: ["string", "null"]
+        sorobanRpc:
+          type: string
+        networkPassphrase:
+          type: string
+        network:
+          type: string
+
+    StellarTxResult:
+      type: object
+      required: [demo]
+      properties:
+        xdr:
+          type: ["string", "null"]
+        demo:
+          type: boolean
+        txHash:
+          type: ["string", "null"]
+        orderId:
+          type: ["string", "null"]
+        message:
+          type: ["string", "null"]
+
+    StellarSwapInput:
+      type: object
+      required: [walletAddress]
+      properties:
+        walletAddress:
+          type: string
+        fromTokenContract:
+          type: string
+        toTokenContract:
+          type: string
+        poolContract:
+          type: string
+        amountIn:
+          type: string
+        minAmountOut:
+          type: string
+        zeroForOne:
+          type: boolean
+        deadline:
+          type: integer
+
+    StellarAddLiquidityInput:
+      type: object
+      required: [walletAddress]
+      properties:
+        walletAddress:
+          type: string
+        poolContract:
+          type: string
+        tickLower:
+          type: integer
+        tickUpper:
+          type: integer
+        amount0Desired:
+          type: string
+        amount1Desired:
+          type: string
+        amount0Min:
+          type: string
+        amount1Min:
+          type: string
+        deadline:
+          type: integer
+
+    StellarRemoveLiquidityInput:
+      type: object
+      required: [walletAddress]
+      properties:
+        walletAddress:
+          type: string
+        poolContract:
+          type: string
+        tickLower:
+          type: integer
+        tickUpper:
+          type: integer
+        liquidity:
+          type: string
+        amount0Min:
+          type: string
+        amount1Min:
+          type: string
+
+    StellarStakeInput:
+      type: object
+      required: [walletAddress]
+      properties:
+        walletAddress:
+          type: string
+        farmContract:
+          type: string
+        poolContract:
+          type: string
+        tickLower:
+          type: integer
+        tickUpper:
+          type: integer
+        liquidity:
+          type: string
+        lockWeeks:
+          type: integer
+        autoCompound:
+          type: boolean
+
+    StellarClaimInput:
+      type: object
+      required: [walletAddress]
+      properties:
+        walletAddress:
+          type: string
+        farmContract:
+          type: string
+        poolContract:
+          type: string
+        tickLower:
+          type: integer
+        tickUpper:
+          type: integer
+
+    StellarLimitOrderInput:
+      type: object
+      required: [walletAddress]
+      properties:
+        walletAddress:
+          type: string
+        fromContract:
+          type: string
+        toContract:
+          type: string
+        amount:
+          type: string
+        limitPrice:
+          type: string
+
+    OnChainPoolState:
+      type: object
+      properties:
+        sqrtPrice:
+          type: string
+        tick:
+          type: integer
+        liquidity:
+          type: string
+        feeBps:
+          type: integer
+        token0:
+          type: ["string", "null"]
+        token1:
+          type: ["string", "null"]
