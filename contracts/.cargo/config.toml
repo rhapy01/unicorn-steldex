@@ -1,0 +1,4 @@
+[build]
+# Use rustup's wasm32 std libs when targeting wasm32
+[target.wasm32-unknown-unknown]
+rustflags = ["--sysroot", "/home/runner/.rustup/toolchains/stable-x86_64-unknown-linux-gnu"]
