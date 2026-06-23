@@ -1,0 +1,29 @@
+{
+  "name": "@workspace/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "hello": "tsx ./src/hello.ts",
+    "deploy": "tsx ./src/deploy-contracts.ts",
+    "sync-contracts": "tsx ./src/sync-contracts.ts",
+    "dev": "tsx ./src/dev-onchain.ts",
+    "dev:db": "tsx ./src/dev-local.ts",
+    "test-add-liquidity": "tsx ./src/test-add-liquidity.ts",
+    "test-stake-farm": "tsx ./src/test-stake-farm.ts",
+    "setup-pools": "tsx ./src/setup-all-pools.ts",
+    "deploy-pools": "tsx ./src/deploy-pools-direct.ts",
+    "enable-deployer-trustlines": "tsx ./src/fund-circle-and-seed.ts",
+    "redeploy-factory": "tsx ./src/redeploy-factory.ts",
+    "seed": "tsx ./src/seed-db.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^15.1.0",
+    "pg-embedded": "^0.2.3"
+  }
+}
