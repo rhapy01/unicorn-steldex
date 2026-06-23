@@ -1,0 +1,9 @@
+.local-postgres
+.agents
+contracts/target
+**/*.wasm
+node_modules
+.git
+artifacts/api-server/dist
+artifacts/stellar-dex/dist
+attached_assets

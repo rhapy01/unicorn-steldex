@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/stellar-dex run build",
+  "outputDirectory": "artifacts/stellar-dex/dist/public",
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/index.mjs": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/stellar/keeper-tick",
+      "schedule": "*/1 * * * *"
+    }
+  ]
+}

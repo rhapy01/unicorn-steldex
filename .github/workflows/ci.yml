@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  typescript:
+    name: TypeScript & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Frontend tests
+        run: pnpm --filter @workspace/stellar-dex run test
+
+      - name: API tests
+        run: pnpm --filter @workspace/api-server run test
+
+      - name: Build frontend
+        run: pnpm --filter @workspace/stellar-dex run build
+
+  contracts:
+    name: Soroban Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Run all contract tests
+        working-directory: contracts
+        run: cargo test --workspace -- --nocapture
