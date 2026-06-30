@@ -16,7 +16,7 @@
   "crons": [
     {
       "path": "/api/stellar/keeper-tick",
-      "schedule": "*/1 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
