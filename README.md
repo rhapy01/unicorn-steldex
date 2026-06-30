@@ -10,7 +10,7 @@ A production-grade decentralized exchange on **Stellar Testnet** built with real
 
 | Resource | Link |
 |----------|------|
-| **Live App** | _Add Vercel URL after deploy_ |
+| **Live App** | https://stellar-swap-dex.vercel.app |
 | **GitHub Repo** | https://github.com/rhapy01/unicorn-steldex |
 
 ---
@@ -263,7 +263,7 @@ See [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | Wallet address retrieval | ✅ | `getAddress()` + `requestAccess()` |
 | Transaction signing | ✅ | `signTransaction(xdr, { networkPassphrase })` |
 | Contract addresses | ✅ | See table above — all on testnet |
-| Live demo | ⬜ | Add Vercel URL |
+| Live demo | ✅ | https://stellar-swap-dex.vercel.app |
 | Transaction hash | ⬜ | Execute swap, paste hash above |
 | Screenshots | ⬜ | Add to `docs/screenshots/` |
 
