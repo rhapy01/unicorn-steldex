@@ -99,7 +99,7 @@ async function poolToken(
     .build();
   const sim = await server.simulateTransaction(tx);
   if (StellarSdk.rpc.Api.isSimulationError(sim)) throw new Error(String(sim.error));
-  const hex = sim.result!.retval!.address().contractId().toString("hex");
+  const hex = Buffer.from(sim.result!.retval!.address().contractId()).toString("hex");
   return StellarSdk.StrKey.encodeContract(Buffer.from(hex, "hex"));
 }
 

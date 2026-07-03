@@ -9,6 +9,18 @@ import { rm } from "node:fs/promises";
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(artifactDir, "../..");
+
+/** Resolve workspace:* packages to their source entry points so esbuild can
+ *  bundle them even when node_modules symlinks aren't set up (e.g. on Vercel). */
+function workspaceAlias(name, relEntry) {
+  return [name, path.resolve(repoRoot, relEntry)];
+}
+
+const workspaceAliases = Object.fromEntries([
+  workspaceAlias("@workspace/api-zod", "lib/api-zod/src/index.ts"),
+  workspaceAlias("@workspace/db", "lib/db/src/index.ts"),
+]);
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
@@ -25,6 +37,7 @@ async function buildAll() {
     outdir: distDir,
     outExtension: { ".js": ".mjs" },
     logLevel: "info",
+    alias: workspaceAliases,
     // Some packages may not be bundleable, so we externalize them, we can add more here as needed.
     // Some of the packages below may not be imported or installed, but we're adding them in case they are in the future.
     // Examples of unbundleable packages:
@@ -107,7 +120,7 @@ async function buildAll() {
     sourcemap: "linked",
     plugins: [
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
-      esbuildPluginPino({ transports: ["pino-pretty"] })
+      esbuildPluginPino({ transports: ["pino-pretty"] }),
     ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {

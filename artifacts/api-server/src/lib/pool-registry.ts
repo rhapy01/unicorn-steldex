@@ -50,7 +50,7 @@ async function simulateContract(
 function scAddressToStr(StellarSdk: StellarSdk, val: unknown): string {
   const sc = val as StellarSdk["xdr"]["ScVal"];
   const addr = sc.address();
-  const hex = addr.contractId().toString("hex");
+  const hex = Buffer.from(addr.contractId()).toString("hex");
   return StellarSdk.StrKey.encodeContract(Buffer.from(hex, "hex"));
 }
 

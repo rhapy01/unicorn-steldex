@@ -1,6 +1,7 @@
 #![no_std]
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short,
+    xdr::ToXdr,
     Address, Bytes, BytesN, Env, Vec,
 };
 
@@ -92,9 +93,9 @@ impl Factory {
             FeeTier::High => 2,
         };
         let mut salt_preimage = Bytes::new(&env);
-        salt_preimage.append(&t0.to_xdr(&env));
-        salt_preimage.append(&t1.to_xdr(&env));
-        salt_preimage.push(fee_byte);
+        salt_preimage.append(&t0.clone().to_xdr(&env));
+        salt_preimage.append(&t1.clone().to_xdr(&env));
+        salt_preimage.append(&Bytes::from_array(&env, &[fee_byte]));
         let salt = env.crypto().sha256(&salt_preimage);
 
         let pool_address = env

@@ -1,10 +1,11 @@
+import type { xdr } from "@stellar/stellar-sdk";
 import { getContractConfig } from "./contract-config.js";
 import { listOnChainPools } from "./on-chain-pools.js";
 import { fullRangeTicks } from "./pool-ticks.js";
 
 type StellarSdk = typeof import("@stellar/stellar-sdk");
 type RpcServer = InstanceType<StellarSdk["rpc"]["Server"]>;
-type ScVal = StellarSdk["xdr"]["ScVal"];
+type ScVal = xdr.ScVal;
 
 const SIM_SOURCE = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7";
 const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";

@@ -7,3 +7,8 @@ node_modules
 artifacts/api-server/dist
 artifacts/stellar-dex/dist
 attached_assets
+.cargo
+.rustup
+scripts/tsconfig.tsbuildinfo
+lib/*/dist
+lib/*/tsconfig.tsbuildinfo

@@ -1,3 +1,4 @@
+import type { xdr } from "@stellar/stellar-sdk";
 import { buildOnChainCatalog, type CatalogPool, type CatalogToken } from "./market-catalog.js";
 import { listOnChainPools } from "./on-chain-pools.js";
 import { fullRangeTicks } from "./pool-ticks.js";
@@ -119,7 +120,7 @@ async function fetchHorizonTransactions(walletAddress: string): Promise<RecentTr
 
 function scMapField(
   sdk: StellarSdk,
-  val: StellarSdk["xdr"]["ScVal"],
+  val: xdr.ScVal,
   key: string,
 ): bigint {
   const entries = val.map() ?? [];

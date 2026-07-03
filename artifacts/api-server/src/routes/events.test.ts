@@ -8,18 +8,20 @@ describe("GET /api/stellar/events", () => {
       .get("/api/stellar/events")
       .buffer(true)
       .parse((res, cb) => {
+        const stream = res as import("node:http").IncomingMessage & { destroy?: () => void };
         let data = "";
-        res.on("data", (chunk: Buffer) => {
+        stream.on("data", (chunk: Buffer) => {
           data += chunk.toString();
           if (data.includes("connected")) {
-            res.destroy();
+            stream.destroy?.();
             cb(null, data);
           }
         });
-        res.on("error", () => cb(null, data));
+        stream.on("error", () => cb(null, data));
       });
 
     expect(res.headers["content-type"]).toContain("text/event-stream");
-    expect(res.text).toContain('"type":"connected"');
+    const body = typeof res.body === "string" ? res.body : String(res.body ?? "");
+    expect(body).toContain('"type":"connected"');
   });
 });

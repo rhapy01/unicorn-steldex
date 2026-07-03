@@ -6,6 +6,7 @@
  * exclusively in the user's wallet.
  */
 import { Router, type IRouter, type Response } from "express";
+import type { xdr } from "@stellar/stellar-sdk";
 import { getContractConfig, requireContracts } from "../lib/contract-config.js";
 import { addressScVal, feeTierScVal, scMap } from "../lib/soroban-scval.js";
 import { sendStellarError, toI128String } from "../lib/stellar-errors.js";
@@ -259,7 +260,7 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
   const fromTokenC = new StellarSdk.Contract(fromTokenContract);
   const SOROBAN_FEE = "100000";
 
-  async function singleOpXdr(operation: InstanceType<typeof StellarSdk.Operation>): Promise<string> {
+  async function singleOpXdr(operation: xdr.Operation): Promise<string> {
     const account = await server.getAccount(walletAddress);
     const tx = new StellarSdk.TransactionBuilder(account, {
       fee: SOROBAN_FEE,
@@ -286,7 +287,7 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
       return;
     }
 
-    let operation: InstanceType<typeof StellarSdk.Operation>;
+    let operation: xdr.Operation;
     if (stepId === "wrap-xlm") {
       const balNow = await simulateContractBalance(StellarSdk, server, fromTokenContract, walletAddress);
       const wrapNow =
@@ -669,7 +670,7 @@ router.post("/stellar/add-liquidity", async (req, res): Promise<void> => {
     const SOROBAN_FEE = "100000";
 
     async function singleOpXdr(
-      operation: InstanceType<typeof StellarSdk.Operation>,
+      operation: xdr.Operation,
     ): Promise<string> {
       const account = await server.getAccount(walletAddress);
       const tx = new StellarSdk.TransactionBuilder(account, {
@@ -701,7 +702,7 @@ router.post("/stellar/add-liquidity", async (req, res): Promise<void> => {
         return;
       }
 
-      let operation: InstanceType<typeof StellarSdk.Operation>;
+      let operation: xdr.Operation;
       if (stepId === "wrap-token0" || stepId === "wrap-token1") {
         const wrapToken = stepId === "wrap-token0" ? token0 : token1;
         const wrapNeed = stepId === "wrap-token0" ? amount0Bn : amount1Bn;
@@ -1221,7 +1222,7 @@ router.post("/stellar/limit-order", async (req, res): Promise<void> => {
     const ordersC = new StellarSdk.Contract(config.orders);
     const SOROBAN_FEE = "100000";
 
-    async function singleOpXdr(operation: InstanceType<typeof StellarSdk.Operation>): Promise<string> {
+    async function singleOpXdr(operation: xdr.Operation): Promise<string> {
       const account = await server.getAccount(walletAddress);
       const tx = new StellarSdk.TransactionBuilder(account, {
         fee: SOROBAN_FEE,
@@ -1247,7 +1248,7 @@ router.post("/stellar/limit-order", async (req, res): Promise<void> => {
         return;
       }
 
-      let operation: InstanceType<typeof StellarSdk.Operation>;
+      let operation: xdr.Operation;
       if (stepId === "wrap-xlm") {
         const balNow = await simulateContractBalance(StellarSdk, server, fromContract, walletAddress);
         const wrapNow =
@@ -1314,7 +1315,7 @@ async function poolToken0ForPool(
     .build();
   const sim = await server.simulateTransaction(tx);
   if (StellarSdk.rpc.Api.isSimulationError(sim)) throw new Error(String(sim.error));
-  const hex = sim.result!.retval!.address().contractId().toString("hex");
+  const hex = Buffer.from(sim.result!.retval!.address().contractId()).toString("hex");
   return StellarSdk.StrKey.encodeContract(Buffer.from(hex, "hex"));
 }
 

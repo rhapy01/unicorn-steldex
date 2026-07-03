@@ -14,19 +14,35 @@ function loadEnvFile(file: string): void {
   }
 }
 
-/** Load `.env.contracts` and optional `.env` from repo root (does not overwrite existing vars). */
-export function loadContractEnv(): void {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const roots = [
+function existingRoots(here: string): string[] {
+  return [
     process.cwd(),
     path.join(here, "../../.."), // bundled: dist/index.mjs → repo root
     path.join(here, "../../../.."), // source: src/lib/load-env.ts → repo root
-  ];
-  const root = roots.find((r) => fs.existsSync(path.join(r, ".env.contracts"))) ?? roots[0];
+  ].filter(
+    (root, index, all) =>
+      !!root && all.indexOf(root) === index && fs.existsSync(root),
+  );
+}
 
-  const contractsFile = path.join(root, ".env.contracts");
-  if (fs.existsSync(contractsFile)) loadEnvFile(contractsFile);
+/** Load contract env from repo files and Vercel local env files without overwriting runtime vars. */
+export function loadContractEnv(): void {
+  if (process.env.SKIP_CONTRACT_ENV === "1" || process.env.VITEST === "true") {
+    return;
+  }
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const roots = existingRoots(here);
 
-  const envFile = path.join(root, ".env");
-  if (fs.existsSync(envFile)) loadEnvFile(envFile);
+  const candidateFiles = roots.flatMap((root) => [
+    path.join(root, ".env.contracts"),
+    path.join(root, ".env"),
+    path.join(root, ".vercel", ".env.production.local"),
+    path.join(root, ".vercel", ".env.preview.local"),
+    path.join(root, ".vercel", ".env.development.local"),
+    path.join(root, ".vercel", ".env.local"),
+  ]);
+
+  for (const file of candidateFiles) {
+    if (fs.existsSync(file)) loadEnvFile(file);
+  }
 }

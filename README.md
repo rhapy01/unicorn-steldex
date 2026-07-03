@@ -253,7 +253,7 @@ See [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | README with documentation | ✅ | This file |
 | 10+ meaningful commits | ✅ | `git log --oneline` |
 | CI/CD pipeline | ✅ | `.github/workflows/ci.yml` |
-| 3+ passing tests | ✅ | `npx pnpm test` — 20+ tests |
+| 3+ passing tests | ✅ | `npx pnpm test` — 20 tests (8 frontend + 12 API); `cargo test --workspace` — 6 Rust |
 | Smart contracts (Soroban) | ✅ | `contracts/` — 6 Rust/WASM contracts |
 | Inter-contract communication | ✅ | Router→Factory→Pool, Farm→Pool, Orders→Pool |
 | Event streaming | ✅ | `/api/stellar/events` SSE + Activity page |

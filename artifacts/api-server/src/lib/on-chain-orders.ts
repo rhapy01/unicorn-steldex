@@ -1,3 +1,4 @@
+import type { xdr } from "@stellar/stellar-sdk";
 import { getContractConfig } from "./contract-config.js";
 import { displayPriceToPoolSqrt, poolSqrtToDisplayPrice } from "./clmm-math.js";
 import { decimalsForContract } from "./token-decimals.js";
@@ -5,7 +6,7 @@ import { poolSqrtPrice, poolToken0, poolToken1, quotePoolSwapOutput } from "./sw
 
 type StellarSdk = typeof import("@stellar/stellar-sdk");
 type RpcServer = InstanceType<StellarSdk["rpc"]["Server"]>;
-type ScVal = StellarSdk["xdr"]["ScVal"];
+type ScVal = xdr.ScVal;
 
 const SIM_SOURCE = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7";
 const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
@@ -55,7 +56,7 @@ function scMapAddressStr(sdk: StellarSdk, val: ScVal, key: string): string | nul
     const addr = e.val().address();
     switch (addr.switch().name) {
       case "scAddressTypeContract": {
-        const hex = addr.contractId().toString("hex");
+        const hex = Buffer.from(addr.contractId()).toString("hex");
         return sdk.StrKey.encodeContract(Buffer.from(hex, "hex"));
       }
       case "scAddressTypeAccount": {

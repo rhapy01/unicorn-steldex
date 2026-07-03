@@ -257,7 +257,8 @@ mod test {
         let recipient = Address::generate(&e);
         let client = TokenClient::new(&e, &contract_id);
         client.mint(&user, &10000);
-        client.approve(&user, &spender, &3000, &e.ledger().sequence() + 100);
+        let expiration = e.ledger().sequence() + 100;
+        client.approve(&user, &spender, &3000, &expiration);
         assert_eq!(client.allowance(&user, &spender), 3000);
         client.transfer_from(&spender, &user, &recipient, &1500);
         assert_eq!(client.balance(&recipient), 1500);

@@ -3,14 +3,27 @@ import { Link, useLocation } from "wouter";
 import { useWallet, FREIGHTER_INSTALL_URL } from "@/hooks/use-wallet";
 import { Button } from "@/components/ui/button";
 import {
-  Menu, Zap, ExternalLink, Copy, LogOut, Search, MoreHorizontal,
+  Menu,
+  Zap,
+  ExternalLink,
+  Copy,
+  LogOut,
+  Search,
+  MoreHorizontal,
 } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
@@ -34,7 +47,8 @@ const moreLinks = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { address, isConnecting, freighterInstalled, connect, disconnect } = useWallet();
+  const { address, isConnecting, freighterInstalled, connect, disconnect } =
+    useWallet();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -55,7 +69,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       setIsWalletDialogOpen(false);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast({ title: "Connection failed", description: msg, variant: "destructive" });
+      toast({
+        title: "Connection failed",
+        description: msg,
+        variant: "destructive",
+      });
     }
   };
 
@@ -80,14 +98,113 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col uni-page-bg relative">
+      {/* Bokeh gradient blobs + floating token logos */}
+      <div className="uni-bokeh" aria-hidden="true">
+        <div className="uni-bokeh-blob uni-bokeh-blob-1" />
+        <div className="uni-bokeh-blob uni-bokeh-blob-2" />
+        <div className="uni-bokeh-blob uni-bokeh-blob-3" />
+
+        {/* Token logos scattered in background */}
+        {[
+          {
+            src: "https://cryptologos.cc/logos/stellar-xlm-logo.png",
+            size: 88,
+            top: "8%",
+            left: "6%",
+            delay: "0s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
+            size: 72,
+            top: "12%",
+            left: "88%",
+            delay: "1.5s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+            size: 96,
+            top: "55%",
+            left: "4%",
+            delay: "3s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/tether-usdt-logo.png",
+            size: 68,
+            top: "70%",
+            left: "92%",
+            delay: "0.8s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/euro-coin-eurc-logo.png",
+            size: 60,
+            top: "38%",
+            left: "94%",
+            delay: "2.2s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/stellar-xlm-logo.png",
+            size: 52,
+            top: "80%",
+            left: "22%",
+            delay: "4s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
+            size: 80,
+            top: "30%",
+            left: "2%",
+            delay: "1s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+            size: 64,
+            top: "62%",
+            left: "78%",
+            delay: "3.5s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+            size: 56,
+            top: "18%",
+            left: "50%",
+            delay: "2.8s",
+          },
+          {
+            src: "https://cryptologos.cc/logos/tether-usdt-logo.png",
+            size: 76,
+            top: "85%",
+            left: "58%",
+            delay: "1.8s",
+          },
+        ].map((t, i) => (
+          <img
+            key={i}
+            src={t.src}
+            alt=""
+            draggable={false}
+            className="uni-token-float"
+            style={{
+              width: t.size,
+              height: t.size,
+              top: t.top,
+              left: t.left,
+              animationDelay: t.delay,
+              animationDuration: `${6 + (i % 3) * 2}s`,
+            }}
+          />
+        ))}
+      </div>
+
       <ContractsBanner />
 
-      <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-black/5">
+      <header className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-black/[0.06] shadow-sm">
         <div className="max-w-[1200px] mx-auto px-4 h-[72px] flex items-center justify-between gap-4">
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2 shrink-0">
               <UniLogo className="w-8 h-8" />
-              <span className="font-bold text-lg hidden sm:inline">Unicorn StelDex</span>
+              <span className="font-bold text-lg hidden sm:inline">
+                Unicorn StelDex
+              </span>
             </Link>
             <nav className="hidden md:flex items-center gap-1">
               <NavItems />
@@ -97,14 +214,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full hidden md:flex">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full hidden md:flex"
+                >
                   <MoreHorizontal className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-2xl">
                 {moreLinks.map((link) => (
                   <DropdownMenuItem key={link.href} asChild>
-                    <Link href={link.href} className="cursor-pointer">{link.label}</Link>
+                    <Link href={link.href} className="cursor-pointer">
+                      {link.label}
+                    </Link>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -119,26 +242,44 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 rounded-2xl">
                   <div className="px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Freighter · Testnet</p>
-                    <p className="text-sm font-mono mt-0.5 truncate">{address}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Freighter · Testnet
+                    </p>
+                    <p className="text-sm font-mono mt-0.5 truncate">
+                      {address}
+                    </p>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={copyAddress} className="gap-2 cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={copyAddress}
+                    className="gap-2 cursor-pointer"
+                  >
                     <Copy className="w-4 h-4" /> Copy address
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <a href={`${TESTNET_EXPLORER}${address}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 cursor-pointer">
+                    <a
+                      href={`${TESTNET_EXPLORER}${address}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
                       <ExternalLink className="w-4 h-4" /> Explorer
                     </a>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={disconnect} className="gap-2 text-destructive cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={disconnect}
+                    className="gap-2 text-destructive cursor-pointer"
+                  >
                     <LogOut className="w-4 h-4" /> Disconnect
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Dialog open={isWalletDialogOpen} onOpenChange={setIsWalletDialogOpen}>
+              <Dialog
+                open={isWalletDialogOpen}
+                onOpenChange={setIsWalletDialogOpen}
+              >
                 <DialogTrigger asChild>
                   <Button className="rounded-[16px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-[15px] px-5 h-10">
                     Connect
@@ -183,7 +324,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden rounded-full">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden rounded-full"
+                >
                   <Menu className="w-5 h-5" />
                 </Button>
               </SheetTrigger>
@@ -195,9 +340,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col relative z-10">
-        {children}
-      </main>
+      <main className="flex-1 flex flex-col relative z-10">{children}</main>
     </div>
   );
 }

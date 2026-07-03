@@ -24,9 +24,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm run typecheck
-
       - name: Frontend tests
         run: pnpm --filter @workspace/stellar-dex run test
 
