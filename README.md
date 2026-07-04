@@ -31,7 +31,7 @@ A production-grade decentralized exchange on **Stellar Testnet** built with real
 | **Submission checklist (extra)** | [`docs/SUBMISSION.md`](docs/SUBMISSION.md) |
 | **Screenshots** | [`artifacts/stellar-dex/screenshot/`](artifacts/stellar-dex/screenshot/) |
 | **Demo video** | https://youtu.be/o9YQXTY5A_U |
-| **Sample on-chain tx hash** | _Paste swap tx hash in section below if not already in video_ |
+| **Sample on-chain tx (swap)** | [`a0581915…3942c4`](https://stellar.expert/explorer/testnet/tx/a05819156b09030eb24f011c3fc65e2a08ce0ee7421a3c1b9ec11df64a3942c4) |
 
 ---
 
@@ -46,7 +46,18 @@ A production-grade decentralized exchange on **Stellar Testnet** built with real
 | **Latest green CI run** | https://github.com/rhapy01/unicorn-steldex/actions/runs/28709392382 |
 | **Deployer account (testnet)** | [GC6Y34Q5… on Stellar Expert](https://stellar.expert/explorer/testnet/account/GC6Y34Q5VWMHL3N2GUVY7HDQUCYLEJLRNSPYV6A4BS5JNKRUVOLZZBCI) |
 
-**Sample transaction hash (contract interaction):** _Paste a swap tx hash from the demo (Stellar Expert or Freighter history)._
+### Sample on-chain transactions (Testnet)
+
+Pulled from the deployer account [`GC6Y34Q5…`](https://stellar.expert/explorer/testnet/account/GC6Y34Q5VWMHL3N2GUVY7HDQUCYLEJLRNSPYV6A4BS5JNKRUVOLZZBCI) interacting with live contracts:
+
+| Action | Tx hash | Explorer |
+|--------|---------|----------|
+| **Swap** (`swap_exact_input`) | `a05819156b09030eb24f011c3fc65e2a08ce0ee7421a3c1b9ec11df64a3942c4` | [View](https://stellar.expert/explorer/testnet/tx/a05819156b09030eb24f011c3fc65e2a08ce0ee7421a3c1b9ec11df64a3942c4) |
+| **Add liquidity** (`mint`) | `2cb02d0cdbbfc1abc46102d1a4d341cb8f3e76e0dfbdeaac2f834b50dd22065c` | [View](https://stellar.expert/explorer/testnet/tx/2cb02d0cdbbfc1abc46102d1a4d341cb8f3e76e0dfbdeaac2f834b50dd22065c) |
+| **Farm stake** (`stake`) | `ad65445c6bf3d42220ef51da2da6db3ef695e12a9ade99c0d91a63b11ffc432d` | [View](https://stellar.expert/explorer/testnet/tx/ad65445c6bf3d42220ef51da2da6db3ef695e12a9ade99c0d91a63b11ffc432d) |
+| **Limit order** (`place_order`) | `bf9bbbdd3dc0de3954bd28c56d614e369a0c04f6358b5b4fa28f6f32afad4cbb` | [View](https://stellar.expert/explorer/testnet/tx/bf9bbbdd3dc0de3954bd28c56d614e369a0c04f6358b5b4fa28f6f32afad4cbb) |
+
+**Primary sample (swap):** `a05819156b09030eb24f011c3fc65e2a08ce0ee7421a3c1b9ec11df64a3942c4`
 
 ### Screenshots
 
@@ -430,7 +441,7 @@ DEPLOYER_SECRET_KEY=S... npx pnpm --filter @workspace/scripts run deploy
 | Live demo | ✅ | https://stellar-swap-dex.vercel.app |
 | Screenshots | ✅ | [`artifacts/stellar-dex/screenshot/`](artifacts/stellar-dex/screenshot/) |
 | Demo video | ✅ | https://youtu.be/o9YQXTY5A_U |
-| Transaction hash | ⬜ | Paste in **Live demo** section above (from demo swap) |
+| Transaction hash | ✅ | Swap `a05819156b09030eb24f011c3fc65e2a08ce0ee7421a3c1b9ec11df64a3942c4` (+ mint / stake / place_order in Live demo) |
 
 ---
 
