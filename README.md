@@ -315,7 +315,8 @@ unicorn-steldex/                    ← repo root (workspace root)
 ├── .github/workflows/ci.yml        ← CI pipeline
 ├── docs/
 │   ├── SUBMISSION.md               ← extended submission guide
-│   └── screenshots/                ← add assessor screenshots here
+│   └── INTEGRATION.md              ← external app / chat integration guide
+├── artifacts/stellar-dex/screenshot/ ← demo screenshots (swap, pools, farm, CI)
 ├── package.json                    ← root scripts: test, dev, build, typecheck
 ├── vercel.json                     ← production deployment config
 └── .env.contracts                  ← deployed addresses (local; gitignored)
