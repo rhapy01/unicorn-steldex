@@ -17,7 +17,7 @@ A production-grade decentralized exchange on **Stellar Testnet** built with real
 | **Frontend app (React)** | [`artifacts/stellar-dex/`](artifacts/stellar-dex/) |
 | **API server (Express)** | [`artifacts/api-server/`](artifacts/api-server/) |
 | **Soroban contracts (Rust)** | [`contracts/`](contracts/) — 6 crates: `token`, `factory`, `pool`, `router`, `farm`, `orders` |
-| **Wallet integration (Freighter)** | [`artifacts/stellar-dex/src/hooks/use-wallet.ts`](artifacts/stellar-dex/src/hooks/use-wallet.ts) |
+| **Wallet integration (Freighter)** | [`artifacts/stellar-dex/src/hooks/use-wallet.tsx`](artifacts/stellar-dex/src/hooks/use-wallet.tsx) |
 | **On-chain tx signing flow** | [`artifacts/stellar-dex/src/hooks/use-stellar.ts`](artifacts/stellar-dex/src/hooks/use-stellar.ts) |
 | **Soroban XDR builders (API)** | [`artifacts/api-server/src/routes/stellar.ts`](artifacts/api-server/src/routes/stellar.ts) |
 | **Deployed contract addresses** | Table below · also `GET /api/stellar/contracts` on live app |
@@ -29,9 +29,9 @@ A production-grade decentralized exchange on **Stellar Testnet** built with real
 | **Deployment scripts** | [`scripts/src/`](scripts/src/) — `deploy-contracts.ts`, `redeploy-orders.ts`, etc. |
 | **External integration (chat / other apps)** | [`docs/INTEGRATION.md`](docs/INTEGRATION.md) |
 | **Submission checklist (extra)** | [`docs/SUBMISSION.md`](docs/SUBMISSION.md) |
-| **Screenshots folder** | [`docs/screenshots/`](docs/screenshots/) |
-| **Demo video** | _Add link here after recording_ |
-| **Sample on-chain tx hash** | _Paste swap tx hash in section below after recording demo_ |
+| **Screenshots** | [`artifacts/stellar-dex/screenshot/`](artifacts/stellar-dex/screenshot/) |
+| **Demo video** | https://youtu.be/o9YQXTY5A_U |
+| **Sample on-chain tx hash** | _Paste swap tx hash in section below if not already in video_ |
 
 ---
 
@@ -41,12 +41,31 @@ A production-grade decentralized exchange on **Stellar Testnet** built with real
 |----------|------|
 | **Live App** | https://stellar-swap-dex.vercel.app |
 | **GitHub Repo** | https://github.com/rhapy01/unicorn-steldex |
+| **Demo video** | https://youtu.be/o9YQXTY5A_U |
 | **CI Actions** | https://github.com/rhapy01/unicorn-steldex/actions |
+| **Latest green CI run** | https://github.com/rhapy01/unicorn-steldex/actions/runs/28709392382 |
 | **Deployer account (testnet)** | [GC6Y34Q5… on Stellar Expert](https://stellar.expert/explorer/testnet/account/GC6Y34Q5VWMHL3N2GUVY7HDQUCYLEJLRNSPYV6A4BS5JNKRUVOLZZBCI) |
 
-**Sample transaction hash (contract interaction):** _Execute a swap on the live app and paste the hash here._
+**Sample transaction hash (contract interaction):** _Paste a swap tx hash from the demo (Stellar Expert or Freighter history)._
 
-**Demo video:** _Add YouTube/Loom link here._
+### Screenshots
+
+Folder: [`artifacts/stellar-dex/screenshot/`](artifacts/stellar-dex/screenshot/)
+
+| Screen | File |
+|--------|------|
+| Swap (wallet connected) | [`swap-wallet-connected.png`](artifacts/stellar-dex/screenshot/swap-wallet-connected.png) |
+| Liquidity pools | [`pools.png`](artifacts/stellar-dex/screenshot/pools.png) |
+| Liquidity farm | [`farm.png`](artifacts/stellar-dex/screenshot/farm.png) |
+| Green CI pipeline | [`ci-pipeline.png`](artifacts/stellar-dex/screenshot/ci-pipeline.png) |
+
+![Swap — wallet connected](artifacts/stellar-dex/screenshot/swap-wallet-connected.png)
+
+![Pools](artifacts/stellar-dex/screenshot/pools.png)
+
+![Farm](artifacts/stellar-dex/screenshot/farm.png)
+
+![CI pipeline](artifacts/stellar-dex/screenshot/ci-pipeline.png)
 
 ---
 
@@ -403,14 +422,14 @@ DEPLOYER_SECRET_KEY=S... npx pnpm --filter @workspace/scripts run deploy
 | Event streaming | ✅ | `/api/stellar/events` + Activity page |
 | Mobile responsive UI | ✅ | Sheet nav, responsive grids |
 | Error handling & loading states | ✅ | Skeletons, toasts, error boundary |
-| Stellar wallet integration | ✅ | [`use-wallet.ts`](artifacts/stellar-dex/src/hooks/use-wallet.ts) |
+| Stellar wallet integration | ✅ | [`use-wallet.tsx`](artifacts/stellar-dex/src/hooks/use-wallet.tsx) |
 | Wallet address retrieval | ✅ | `requestAccess()` + `getAddress()` |
 | Transaction signing | ✅ | `signTransaction(xdr, { networkPassphrase })` |
 | Contract addresses | ✅ | Table above + `GET /api/stellar/contracts` |
 | Live demo | ✅ | https://stellar-swap-dex.vercel.app |
-| Transaction hash | ⬜ | Paste in **Live demo** section above |
-| Screenshots | ⬜ | Add to [`docs/screenshots/`](docs/screenshots/) |
-| Demo video | ⬜ | Paste link in **Live demo** section above |
+| Screenshots | ✅ | [`artifacts/stellar-dex/screenshot/`](artifacts/stellar-dex/screenshot/) |
+| Demo video | ✅ | https://youtu.be/o9YQXTY5A_U |
+| Transaction hash | ⬜ | Paste in **Live demo** section above (from demo swap) |
 
 ---
 
