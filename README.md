@@ -27,6 +27,7 @@ A production-grade decentralized exchange on **Stellar Testnet** built with real
 | **OpenAPI spec** | [`lib/api-spec/openapi.yaml`](lib/api-spec/openapi.yaml) |
 | **Generated API types / client** | [`lib/api-zod/`](lib/api-zod/) · [`lib/api-client-react/`](lib/api-client-react/) |
 | **Deployment scripts** | [`scripts/src/`](scripts/src/) — `deploy-contracts.ts`, `redeploy-orders.ts`, etc. |
+| **External integration (chat / other apps)** | [`docs/INTEGRATION.md`](docs/INTEGRATION.md) |
 | **Submission checklist (extra)** | [`docs/SUBMISSION.md`](docs/SUBMISSION.md) |
 | **Screenshots folder** | [`docs/screenshots/`](docs/screenshots/) |
 | **Demo video** | _Add link here after recording_ |

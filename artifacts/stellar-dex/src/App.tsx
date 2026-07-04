@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Layout } from "@/components/layout";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { WalletProvider } from "@/hooks/use-wallet";
 
 import Swap from "@/pages/swap";
 import Explore from "@/pages/explore";
@@ -48,7 +49,9 @@ function App() {
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <ErrorBoundary>
-              <Router />
+              <WalletProvider>
+                <Router />
+              </WalletProvider>
             </ErrorBoundary>
           </WouterRouter>
           <Toaster />

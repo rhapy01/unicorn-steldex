@@ -292,7 +292,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <div className="space-y-3 pt-2">
                     <button
                       onClick={handleConnect}
-                      disabled={isConnecting || freighterInstalled === false}
+                      disabled={isConnecting}
                       className="w-full flex items-center gap-3 p-4 rounded-[20px] border border-border hover:border-primary/30 hover:bg-muted/30 transition-all disabled:opacity-50"
                     >
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -302,11 +302,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <p className="font-semibold">Freighter Wallet</p>
                         <p className="text-xs text-muted-foreground">
                           {freighterInstalled === false
-                            ? "Extension not detected"
+                            ? "Click to connect — unlock Freighter if prompted"
                             : "Sign Stellar testnet transactions"}
                         </p>
                       </div>
                     </button>
+                    <p className="text-[11px] text-muted-foreground text-center px-1">
+                      Use Freighter on <span className="font-medium">Testnet</span>. Unlock the
+                      extension before connecting.
+                    </p>
                     {freighterInstalled === false && (
                       <a
                         href={FREIGHTER_INSTALL_URL}
