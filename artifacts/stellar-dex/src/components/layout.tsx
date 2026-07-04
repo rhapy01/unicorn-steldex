@@ -301,16 +301,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <div className="text-left flex-1">
                         <p className="font-semibold">Freighter Wallet</p>
                         <p className="text-xs text-muted-foreground">
-                          {freighterInstalled === false
-                            ? "Click to connect — unlock Freighter if prompted"
-                            : "Sign Stellar testnet transactions"}
+                          Stellar Testnet
                         </p>
                       </div>
                     </button>
-                    <p className="text-[11px] text-muted-foreground text-center px-1">
-                      Use Freighter on <span className="font-medium">Testnet</span>. Unlock the
-                      extension before connecting.
-                    </p>
                     {freighterInstalled === false && (
                       <a
                         href={FREIGHTER_INSTALL_URL}
