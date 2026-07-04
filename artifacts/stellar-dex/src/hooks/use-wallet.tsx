@@ -1,7 +1,8 @@
 /**
- * Freighter wallet — follows official docs:
- * https://docs.freighter.app/extension-freighter-api/connecting
- * https://docs.freighter.app/extension-freighter-api/signing
+ * Freighter wallet integration.
+ * Connect = requestAccess() — do not trust isConnected() alone; it often
+ * returns false while the extension is installed (late content-script inject).
+ * Freighter sets window.freighter when ready (see @stellar/freighter-api isConnected.ts).
  */
 import {
   createContext,
@@ -13,7 +14,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  isConnected,
   requestAccess,
   signTransaction,
   getNetworkDetails,
@@ -25,6 +25,8 @@ const WALLET_KEY = "stellar_wallet_address";
 
 export const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
 export const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
+
+type FreighterWindow = Window & { freighter?: boolean };
 
 export type WalletState = {
   address: string | null;
@@ -38,13 +40,19 @@ export type WalletState = {
 
 const WalletContext = createContext<WalletState | null>(null);
 
-async function freighterReady(): Promise<boolean> {
-  const first = await isConnected();
-  if (first.isConnected) return true;
-  // Extension injects slightly after page load — one short retry only.
-  await new Promise((r) => setTimeout(r, 300));
-  const second = await isConnected();
-  return !!second.isConnected;
+function hasFreighterInject(): boolean {
+  return typeof window !== "undefined" && !!(window as FreighterWindow).freighter;
+}
+
+/** Wait for Freighter content script (window.freighter). Soft wait only. */
+async function waitForInject(maxMs = 4000): Promise<boolean> {
+  if (hasFreighterInject()) return true;
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    await new Promise((r) => setTimeout(r, 100));
+    if (hasFreighterInject()) return true;
+  }
+  return hasFreighterInject();
 }
 
 function useWalletState(): WalletState {
@@ -55,17 +63,19 @@ function useWalletState(): WalletState {
   const [freighterInstalled, setFreighterInstalled] = useState<boolean | null>(null);
   const [networkPassphrase, setNetworkPassphrase] = useState(TESTNET_PASSPHRASE);
 
-  // Restore session if this site is already on Freighter's allow list.
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      try {
-        const ready = await freighterReady();
-        if (cancelled) return;
-        setFreighterInstalled(ready);
-        if (!ready) return;
+      await waitForInject(2000);
+      if (cancelled) return;
 
+      const injected = hasFreighterInject();
+      setFreighterInstalled(injected);
+
+      if (!injected || !localStorage.getItem(WALLET_KEY)) return;
+
+      try {
         const allowed = await isAllowed();
         if (cancelled || !allowed.isAllowed) return;
 
@@ -80,7 +90,7 @@ function useWalletState(): WalletState {
           setNetworkPassphrase(network.networkPassphrase);
         }
       } catch {
-        if (!cancelled) setFreighterInstalled(false);
+        // leave cached address; user can reconnect
       }
     })();
 
@@ -89,25 +99,21 @@ function useWalletState(): WalletState {
     };
   }, []);
 
-  // Docs: isConnected() then requestAccess()
   const connect = useCallback(async () => {
     setIsConnecting(true);
     try {
-      const ready = await freighterReady();
-      setFreighterInstalled(ready);
-      if (!ready) {
-        throw new Error(
-          "Freighter is not installed. Install from freighter.app, unlock it, set network to Testnet, then refresh this page."
-        );
-      }
+      // Wait for content script — do NOT abort if isConnected is false.
+      await waitForInject(4000);
 
       const access = await requestAccess();
       if (access.error) {
         throw new Error(access.error.message || "Access denied in Freighter");
       }
       if (!access.address) {
-        throw new Error("No address returned from Freighter");
+        throw new Error("Unlock Freighter, approve this site, then try Connect again.");
       }
+
+      setFreighterInstalled(true);
 
       const network = await getNetworkDetails();
       if (network.networkPassphrase && !network.error) {
@@ -116,6 +122,16 @@ function useWalletState(): WalletState {
 
       setAddress(access.address);
       localStorage.setItem(WALLET_KEY, access.address);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Only mention install if Freighter never injected into the page.
+      if (!hasFreighterInject() && /timeout|failed to fetch|could not establish|receiving end/i.test(msg)) {
+        setFreighterInstalled(false);
+        throw new Error(
+          "Cannot reach Freighter. Unlock the extension, refresh this page, set network to Testnet, then Connect again."
+        );
+      }
+      throw e instanceof Error ? e : new Error(msg);
     } finally {
       setIsConnecting(false);
     }
@@ -126,7 +142,6 @@ function useWalletState(): WalletState {
     localStorage.removeItem(WALLET_KEY);
   }, []);
 
-  // Docs: signTransaction(xdr, { networkPassphrase, address })
   const signTx = useCallback(
     async (xdr: string): Promise<string> => {
       if (!address) throw new Error("Connect wallet first");
