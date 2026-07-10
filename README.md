@@ -1,5 +1,7 @@
 # Unicorn StelDex
 
+[![CI](https://github.com/rhapy01/unicorn-steldex/actions/workflows/ci.yml/badge.svg)](https://github.com/rhapy01/unicorn-steldex/actions/workflows/ci.yml)
+
 A production-grade decentralized exchange on **Stellar Testnet** built with real **Soroban smart contracts**: concentrated liquidity pools (Uniswap V3-style CLMM), veToken farming, on-chain limit orders, multi-hop routing, and **Freighter wallet integration**.
 
 > **This is a pnpm monorepo.** The frontend and API live under `artifacts/`, not the repo root. Smart contracts live under `contracts/`. Shared libraries live under `lib/`. If you are reviewing or verifying this project, use the navigation tables below — they point to every requirement and where it lives in the tree.
@@ -12,7 +14,7 @@ A production-grade decentralized exchange on **Stellar Testnet** built with real
 |--------------------------|------------------|
 | **Live deployed app** | https://stellar-swap-dex.vercel.app |
 | **Public GitHub repo** | https://github.com/rhapy01/unicorn-steldex |
-| **CI pipeline (green runs)** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) · [Actions tab](https://github.com/rhapy01/unicorn-steldex/actions) |
+| **CI/CD pipeline (proof)** | [Jump to CI/CD section](#cicd-pipeline--proof-for-reviewers) · [workflow file](.github/workflows/ci.yml) · [green Actions runs](https://github.com/rhapy01/unicorn-steldex/actions) · [screenshot](artifacts/stellar-dex/screenshot/ci-pipeline.png) |
 | **Run all tests locally** | `npx pnpm test` (root `package.json`) + `cd contracts && cargo test --workspace` |
 | **Frontend app (React)** | [`artifacts/stellar-dex/`](artifacts/stellar-dex/) |
 | **API server (Express)** | [`artifacts/api-server/`](artifacts/api-server/) |
@@ -249,17 +251,37 @@ Contract test snapshots: `contracts/*/test_snapshots/`
 
 ---
 
-## CI/CD
+## CI/CD pipeline — proof for reviewers
 
-**Workflow file:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml)  
-**Live runs:** https://github.com/rhapy01/unicorn-steldex/actions
+This project has a working **CI/CD pipeline**. You do not need to ask the author — verify it with the links below.
 
-On every push to `main`:
+### What is set up
+
+| Piece | What it does | Where |
+|-------|--------------|--------|
+| **CI (Continuous Integration)** | On every push / PR to `main`, GitHub Actions runs frontend tests, API tests, frontend build, and all Soroban contract tests | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
+| **CD (Continuous Deployment)** | Pushing to `main` auto-deploys the frontend + API to Vercel | Live app: https://stellar-swap-dex.vercel.app · config: [`vercel.json`](vercel.json) |
+
+### How to verify in under 60 seconds
+
+1. Open the workflow file: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+2. Open the Actions tab and confirm recent runs are **green (success)**: https://github.com/rhapy01/unicorn-steldex/actions
+3. Open one successful run (example): https://github.com/rhapy01/unicorn-steldex/actions/runs/28710552104
+4. Confirm both jobs passed: **TypeScript & Tests** and **Soroban Contract Tests**
+5. See the screenshot of a green CI run below (also in the Live demo section)
+
+### Pipeline jobs (what CI runs)
 
 | Job | Steps |
 |-----|-------|
 | **TypeScript & Tests** | `pnpm install` → frontend vitest → API vitest → frontend build |
 | **Soroban Contract Tests** | `cargo test --workspace` in `contracts/` |
+
+### Visual proof (green CI run)
+
+![CI pipeline — green GitHub Actions run](artifacts/stellar-dex/screenshot/ci-pipeline.png)
+
+**Status badge (live):** [![CI](https://github.com/rhapy01/unicorn-steldex/actions/workflows/ci.yml/badge.svg)](https://github.com/rhapy01/unicorn-steldex/actions/workflows/ci.yml)
 
 ---
 
@@ -427,7 +449,7 @@ DEPLOYER_SECRET_KEY=S... npx pnpm --filter @workspace/scripts run deploy
 | Public GitHub repo | ✅ | https://github.com/rhapy01/unicorn-steldex |
 | README with documentation | ✅ | This file |
 | 10+ meaningful commits | ✅ | `git log --oneline` on `main` |
-| CI/CD pipeline | ✅ | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) · [Actions](https://github.com/rhapy01/unicorn-steldex/actions) |
+| CI/CD pipeline | ✅ | [Proof section](#cicd-pipeline--proof-for-reviewers) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml) · [green Actions](https://github.com/rhapy01/unicorn-steldex/actions) · [screenshot](artifacts/stellar-dex/screenshot/ci-pipeline.png) · Vercel CD → https://stellar-swap-dex.vercel.app |
 | 3+ passing tests | ✅ | `npx pnpm test` (20) + `cargo test --workspace` (6) |
 | Smart contracts (Soroban) | ✅ | [`contracts/`](contracts/) — 6 Rust/WASM crates |
 | Inter-contract communication | ✅ | Router→Factory→Pool, Farm→Pool, Orders→Pool |
