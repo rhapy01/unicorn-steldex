@@ -99,8 +99,8 @@ async function poolToken(
     .build();
   const sim = await server.simulateTransaction(tx);
   if (StellarSdk.rpc.Api.isSimulationError(sim)) throw new Error(String(sim.error));
-  const hex = Buffer.from(sim.result!.retval!.address().contractId()).toString("hex");
-  return StellarSdk.StrKey.encodeContract(Buffer.from(hex, "hex"));
+  const contractIdBytes = sim.result!.retval!.address().contractId() as unknown as Uint8Array;
+  return StellarSdk.StrKey.encodeContract(Buffer.from(contractIdBytes));
 }
 
 export async function poolToken0(
@@ -258,4 +258,27 @@ export async function buildPoolSwapOperation(
     StellarSdk.nativeToScVal(amountIn, { type: "i128" }),
     StellarSdk.nativeToScVal(priceLimit, { type: "u128" }),
   );
+}
+
+/** Chain single-pool quotes along a multi-hop path. */
+export async function quoteRouteSwapOutput(
+  StellarSdk: StellarSdk,
+  server: RpcServer,
+  hops: Array<{ poolAddress: string; tokenIn: string }>,
+  amountIn: bigint,
+): Promise<{ amountOut: bigint; hopAmounts: bigint[] }> {
+  let current = amountIn;
+  const hopAmounts: bigint[] = [];
+  for (const hop of hops) {
+    current = await quotePoolSwapOutput(
+      StellarSdk,
+      server,
+      hop.poolAddress,
+      hop.tokenIn,
+      current,
+    );
+    hopAmounts.push(current);
+    if (current <= 0n) break;
+  }
+  return { amountOut: current, hopAmounts };
 }

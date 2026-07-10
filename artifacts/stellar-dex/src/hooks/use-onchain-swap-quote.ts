@@ -9,8 +9,10 @@ export type OnChainSwapQuote = {
   priceImpact: number;
   fee: number;
   route: string[];
+  hops?: number;
   amountOutRaw?: string;
   minAmountOutRaw?: string;
+  slippageBps?: number;
 };
 
 export function isPoolSwapPair(symbolA: string, symbolB: string): boolean {

@@ -6,7 +6,7 @@ import { useContracts } from "@/hooks/use-contracts";
 import { formatBalanceDisplay, useWalletBalances } from "@/hooks/use-wallet-balances";
 import { useAddCircleTrustlines } from "@/hooks/use-trustlines";
 import { useOnChainSwapQuote } from "@/hooks/use-onchain-swap-quote";
-import { CIRCLE_FAUCET_URL, circleTrustlinesNeeded } from "@/lib/circle-assets";
+import { CIRCLE_FAUCET_URL, circleStableForSymbol, circleTrustlinesNeeded } from "@/lib/circle-assets";
 import { parseTokenAmount, resolveTokenContract, tokenDecimals } from "@/lib/onchain";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,9 @@ export default function Swap() {
   const [toTokenId, setToTokenId] = useState<number | null>(null);
   const [selecting, setSelecting] = useState<"from" | "to" | null>(null);
   const [tokenSearch, setTokenSearch] = useState("");
+  const [slippageBps, setSlippageBps] = useState(50); // 0.5%
+  const [showSlippage, setShowSlippage] = useState(false);
+  const [customSlippage, setCustomSlippage] = useState("0.5");
 
   const { data: tokens, isLoading: isLoadingTokens } = useListTokens();
 
@@ -76,6 +79,7 @@ export default function Swap() {
     fromTokenContract: fromContract,
     toTokenContract: toContract,
     amountIn: amountInRaw,
+    slippageBps,
     enabled: hasContracts && !!address && !!amountInRaw,
   });
 
@@ -98,6 +102,13 @@ export default function Swap() {
     : [];
   const needsCircleTrustlines = !!address && missingTrustlines.length > 0;
   const swapNeedsTrustline = circleTrustlineGap.length > 0;
+  const sellingCircle =
+    fromToken && circleStableForSymbol(fromToken.symbol) != null;
+  const needsCircleFaucet =
+    !!address &&
+    !!sellingCircle &&
+    missingTrustlines.length === 0 &&
+    (fromBalance === undefined || fromBalance <= 0);
 
   const handleEnableCircleAssets = async () => {
     try {
@@ -194,7 +205,7 @@ export default function Swap() {
         poolContract: contracts.pool || undefined,
         amountIn: parseTokenAmount(fromAmount, tokenDecimals(fromToken.symbol)).toString(),
         minAmountOut: quote?.minAmountOutRaw,
-        slippageBps: 50,
+        slippageBps,
       });
       toast({
         title: "Swap confirmed",
@@ -350,7 +361,70 @@ export default function Swap() {
           </div>
         </div>
 
-        <div className="p-1 pt-3">
+        {/* Slippage + route details */}
+        <div className="px-3 pt-3 pb-1 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setShowSlippage((v) => !v)}
+              className="text-[13px] text-muted-foreground hover:text-foreground transition-colors font-medium"
+            >
+              Slippage · {(slippageBps / 100).toFixed(slippageBps % 100 === 0 ? 1 : 2)}%
+            </button>
+            {quote?.route && quote.route.length > 0 && (
+              <span className="text-[12px] text-muted-foreground truncate max-w-[60%] text-right">
+                Route: {quote.route.join(" → ")}
+                {(quote.hops ?? quote.route.length - 1) > 1 ? " (multi-hop)" : ""}
+              </span>
+            )}
+          </div>
+          {showSlippage && (
+            <div className="flex flex-wrap items-center gap-2">
+              {[10, 50, 100, 300].map((bps) => (
+                <button
+                  key={bps}
+                  type="button"
+                  onClick={() => {
+                    setSlippageBps(bps);
+                    setCustomSlippage((bps / 100).toString());
+                  }}
+                  className={`rounded-[12px] px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+                    slippageBps === bps
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-[#f5f5f7] text-foreground hover:bg-[#ebebed]"
+                  }`}
+                >
+                  {(bps / 100).toFixed(bps % 100 === 0 ? 1 : 2)}%
+                </button>
+              ))}
+              <div className="flex items-center gap-1 rounded-[12px] bg-[#f5f5f7] px-2 py-1">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  aria-label="Custom slippage percent"
+                  className="w-12 bg-transparent text-[13px] font-semibold outline-none text-right"
+                  value={customSlippage}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9.]/g, "");
+                    setCustomSlippage(raw);
+                    const pct = parseFloat(raw);
+                    if (!Number.isFinite(pct)) return;
+                    const bps = Math.round(pct * 100);
+                    setSlippageBps(Math.min(Math.max(bps, 1), 5000));
+                  }}
+                />
+                <span className="text-[13px] text-muted-foreground">%</span>
+              </div>
+            </div>
+          )}
+          {quote && (
+            <p className="text-[12px] text-muted-foreground">
+              Min received: {quote.minimumReceived.toFixed(6)} {toToken?.symbol ?? ""}
+            </p>
+          )}
+        </div>
+
+        <div className="p-1 pt-2">
           {showGetStarted ? (
             <button type="button" onClick={handlePrimaryAction} className="uni-get-started-btn">
               Get started
@@ -397,7 +471,7 @@ export default function Swap() {
           <p className="text-[13px] text-amber-900/80 mt-1 leading-relaxed">
             Stellar requires a trustline before you can receive or swap{" "}
             {missingTrustlines.join(" and ")}. Approve once in Freighter (~0.5 XLM reserve per
-            asset), then swap or claim from the Circle faucet.
+            asset), then claim test tokens from the Circle faucet.
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-3">
             <button
@@ -420,10 +494,31 @@ export default function Swap() {
         </div>
       )}
 
+      {needsCircleFaucet && (
+        <div className="w-full max-w-[480px] mt-4 rounded-[20px] border border-sky-200/80 bg-sky-50 px-4 py-3.5">
+          <p className="text-[14px] font-medium text-sky-950">
+            Get test {fromToken?.symbol} from Circle
+          </p>
+          <p className="text-[13px] text-sky-900/80 mt-1 leading-relaxed">
+            Trustline is ready, but your {fromToken?.symbol} balance is 0. Claim free testnet
+            tokens at the Circle faucet (Stellar Testnet → paste your Freighter address), then
+            swap here. Multi-hop routes work via XLM / pUSDC hubs when a direct pool is missing.
+          </p>
+          <a
+            href={CIRCLE_FAUCET_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex mt-3 rounded-[14px] bg-sky-900 text-sky-50 px-4 py-2 text-[14px] font-semibold hover:bg-sky-800 transition-colors"
+          >
+            Open Circle faucet
+          </a>
+        </div>
+      )}
+
       <p className="text-center text-[14px] text-muted-foreground mt-8 max-w-[520px] leading-relaxed">
         Buy and sell tokens with{" "}
         <span className="text-primary font-medium">zero app fees</span> on Stellar testnet
-        including XLM, pUSDC, cUSDC, EURC, and on-chain routes.
+        including XLM, pUSDC, cUSDC, EURC, with multi-hop routing when needed.
       </p>
 
       {/* Token picker */}

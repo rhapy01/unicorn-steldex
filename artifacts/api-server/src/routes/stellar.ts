@@ -21,10 +21,11 @@ import {
   buildPoolSwapOperation,
   parseAmountIn,
   quotePoolSwapOutput,
+  quoteRouteSwapOutput,
 } from "../lib/swap-sim.js";
 import { listFactoryPools, resolvePoolForTokens } from "../lib/pool-registry.js";
 import { decimalsForContract } from "../lib/token-decimals.js";
-import { isRoutableSwap, routeSymbols } from "../lib/swap-route.js";
+import { findSwapRoute, routeSymbols } from "../lib/swap-route.js";
 import {
   getOnChainFarmOverview,
   getOnChainFarmPositions,
@@ -163,7 +164,7 @@ type SwapBuildParams = {
   stepId?: string;
 };
 
-/** Build multi-step swap XDR (wrap → approve → swap). Shared by /swap and fillable /limit-order. */
+/** Build multi-step swap XDR (wrap → approve/swap per hop). Shared by /swap and fillable /limit-order. */
 async function handleSwapRequest(res: Response, params: SwapBuildParams): Promise<void> {
   const {
     walletAddress,
@@ -188,44 +189,34 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
 
   const server = rpcServer(StellarSdk);
   const pools = await listFactoryPools(StellarSdk, server, config);
-  if (!isRoutableSwap(fromTokenContract, toTokenContract, pools)) {
+  const route = findSwapRoute(fromTokenContract, toTokenContract, pools);
+  if (!route) {
     res.status(422).json({
-      error: "No on-chain pool for this pair. Run: pnpm --filter @workspace/scripts run setup-pools",
+      error:
+        "No on-chain route for this pair (direct or multi-hop). Seed pools: pnpm --filter @workspace/scripts run setup-pools",
     });
     return;
   }
 
-  const poolInfo = await resolvePoolForTokens(
-    StellarSdk,
-    server,
-    config,
-    fromTokenContract,
-    toTokenContract,
-  );
-  if (!poolInfo) {
-    res.status(422).json({ error: "Pool not found for this token pair." });
-    return;
-  }
-
   const amountInBn = parseAmountIn(amountIn);
-  const poolAddress = poolInfo.address;
   const xlmContract = config.tokens.XLM;
   const pUsdcContract = config.poolUsdc || config.tokens.pUSDC;
   const stellarContract = config.tokens.STELLAR;
+  const routeLabels = routeSymbols(route.path, config);
 
-  let minOutBn = minAmountOut != null && String(minAmountOut).length > 0
-    ? parseAmountIn(String(minAmountOut))
-    : 0n;
+  const { amountOut: quotedOut } = await quoteRouteSwapOutput(
+    StellarSdk,
+    server,
+    route.hops.map((h) => ({ poolAddress: h.pool.address, tokenIn: h.tokenIn })),
+    amountInBn,
+  );
 
+  let minOutBn =
+    minAmountOut != null && String(minAmountOut).length > 0
+      ? parseAmountIn(String(minAmountOut))
+      : 0n;
   if (minOutBn === 0n) {
-    const quoted = await quotePoolSwapOutput(
-      StellarSdk,
-      server,
-      poolInfo.address,
-      fromTokenContract,
-      amountInBn,
-    );
-    minOutBn = applySlippage(quoted, Number(slippageBps) || 50);
+    minOutBn = applySlippage(quotedOut, Number(slippageBps) || 50);
   }
 
   const fromBal = await simulateContractBalance(StellarSdk, server, fromTokenContract, walletAddress);
@@ -245,7 +236,7 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
       faucetTx.push(mintHash);
     } else if (fromTokenContract !== xlmContract) {
       res.status(422).json({
-        error: `Insufficient balance (have ${fromBal}, need ${amountInBn}). For cUSDC/EURC use the Circle faucet.`,
+        error: `Insufficient balance (have ${fromBal}, need ${amountInBn}). For cUSDC/EURC enable trustlines and use https://faucet.circle.com/`,
       });
       return;
     }
@@ -256,8 +247,6 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
 
   const maxApprove = BigInt("9223372036854775807");
   const walletSc = new StellarSdk.Address(walletAddress);
-  const poolSc = new StellarSdk.Address(poolAddress);
-  const fromTokenC = new StellarSdk.Contract(fromTokenContract);
   const SOROBAN_FEE = "100000";
 
   async function singleOpXdr(operation: xdr.Operation): Promise<string> {
@@ -277,8 +266,24 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
   if (wrapAmount > 0n) {
     stepPlan.push({ id: "wrap-xlm", label: "Wrap XLM for swap" });
   }
-  stepPlan.push({ id: "approve-pool", label: "Approve pool" });
-  stepPlan.push({ id: "swap", label: "Execute swap" });
+  for (let i = 0; i < route.hops.length; i++) {
+    const hopSymIn = routeLabels[i] ?? `T${i}`;
+    const hopSymOut = routeLabels[i + 1] ?? `T${i + 1}`;
+    stepPlan.push({
+      id: `approve-${i}`,
+      label:
+        route.hops.length === 1
+          ? "Approve pool"
+          : `Approve hop ${i + 1} (${hopSymIn}→${hopSymOut})`,
+    });
+    stepPlan.push({
+      id: `swap-${i}`,
+      label:
+        route.hops.length === 1
+          ? "Execute swap"
+          : `Swap hop ${i + 1} (${hopSymIn}→${hopSymOut})`,
+    });
+  }
 
   if (stepId) {
     const step = stepPlan.find((s) => s.id === stepId);
@@ -289,6 +294,7 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
 
     let operation: xdr.Operation;
     if (stepId === "wrap-xlm") {
+      const fromTokenC = new StellarSdk.Contract(fromTokenContract);
       const balNow = await simulateContractBalance(StellarSdk, server, fromTokenContract, walletAddress);
       const wrapNow =
         fromTokenContract === xlmContract && balNow < amountInBn ? amountInBn - balNow : 0n;
@@ -302,24 +308,53 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
         walletSc.toScVal(),
         StellarSdk.nativeToScVal(wrapNow, { type: "i128" }),
       );
-    } else if (stepId === "approve-pool") {
+    } else if (stepId.startsWith("approve-")) {
+      const hopIndex = Number(stepId.slice("approve-".length));
+      const hop = route.hops[hopIndex];
+      if (!hop) {
+        res.status(400).json({ error: `Invalid hop ${hopIndex}` });
+        return;
+      }
+      const tokenC = new StellarSdk.Contract(hop.tokenIn);
+      const poolSc = new StellarSdk.Address(hop.pool.address);
       const latestNow = await server.getLatestLedger();
-      operation = fromTokenC.call(
+      operation = tokenC.call(
         "approve",
         walletSc.toScVal(),
         poolSc.toScVal(),
         StellarSdk.nativeToScVal(maxApprove, { type: "i128" }),
         StellarSdk.nativeToScVal(latestNow.sequence + 100_000, { type: "u32" }),
       );
-    } else {
+    } else if (stepId.startsWith("swap-")) {
+      const hopIndex = Number(stepId.slice("swap-".length));
+      const hop = route.hops[hopIndex];
+      if (!hop) {
+        res.status(400).json({ error: `Invalid hop ${hopIndex}` });
+        return;
+      }
+      let hopAmountIn = amountInBn;
+      if (hopIndex > 0) {
+        // After prior hops, spend the intermediate token balance (minus dust).
+        const bal = await simulateContractBalance(StellarSdk, server, hop.tokenIn, walletAddress);
+        if (bal <= 0n) {
+          res.status(422).json({
+            error: `No intermediate balance for hop ${hopIndex + 1}. Prior hop may have failed.`,
+          });
+          return;
+        }
+        hopAmountIn = bal;
+      }
       operation = await buildPoolSwapOperation(
         StellarSdk,
         server,
-        poolInfo.address,
+        hop.pool.address,
         walletAddress,
-        fromTokenContract,
-        amountInBn,
+        hop.tokenIn,
+        hopAmountIn,
       );
+    } else {
+      res.status(400).json({ error: `Unknown stepId "${stepId}"` });
+      return;
     }
 
     res.json({
@@ -334,6 +369,8 @@ async function handleSwapRequest(res: Response, params: SwapBuildParams): Promis
     steps: stepPlan,
     sequential: true,
     minAmountOut: minOutBn.toString(),
+    route: routeLabels,
+    hops: route.hops.length,
     faucetTx: faucetTx.length > 0 ? faucetTx : undefined,
   });
 }
@@ -453,11 +490,12 @@ router.post("/stellar/swap/quote", async (req, res): Promise<void> => {
     const StellarSdk = await getStellarSdk();
     const server = rpcServer(StellarSdk);
     const pools = await listFactoryPools(StellarSdk, server, config);
+    const route = findSwapRoute(fromTokenContract, toTokenContract, pools);
 
-    if (!isRoutableSwap(fromTokenContract, toTokenContract, pools)) {
+    if (!route) {
       res.status(422).json({
         error:
-          "No on-chain pool for this pair yet. Run: pnpm --filter @workspace/scripts run setup-pools",
+          "No on-chain route for this pair (direct or multi-hop). Seed pools: pnpm --filter @workspace/scripts run setup-pools",
       });
       return;
     }
@@ -468,23 +506,10 @@ router.post("/stellar/swap/quote", async (req, res): Promise<void> => {
       return;
     }
 
-    const poolInfo = await resolvePoolForTokens(
+    const { amountOut } = await quoteRouteSwapOutput(
       StellarSdk,
       server,
-      config,
-      fromTokenContract,
-      toTokenContract,
-    );
-    if (!poolInfo) {
-      res.status(422).json({ error: "No pool for this pair." });
-      return;
-    }
-
-    const amountOut = await quotePoolSwapOutput(
-      StellarSdk,
-      server,
-      poolInfo.address,
-      fromTokenContract,
+      route.hops.map((h) => ({ poolAddress: h.pool.address, tokenIn: h.tokenIn })),
       amountInBn,
     );
 
@@ -494,6 +519,7 @@ router.post("/stellar/swap/quote", async (req, res): Promise<void> => {
     const outHuman = Number(amountOut) / 10 ** toDecimals;
     const minHuman = Number(minOut) / 10 ** toDecimals;
     const inHuman = Number(amountInBn) / 10 ** fromDecimals;
+    const routeLabels = routeSymbols(route.path, config);
 
     res.json({
       onChain: true,
@@ -502,10 +528,12 @@ router.post("/stellar/swap/quote", async (req, res): Promise<void> => {
       minimumReceived: minHuman,
       executionPrice: inHuman > 0 ? outHuman / inHuman : 0,
       priceImpact: 0,
-      fee: inHuman * 0.003,
-      route: routeSymbols(fromTokenContract, toTokenContract, config),
+      fee: inHuman * 0.003 * route.hops.length,
+      route: routeLabels,
+      hops: route.hops.length,
       amountOutRaw: amountOut.toString(),
       minAmountOutRaw: minOut.toString(),
+      slippageBps: Number(slippageBps) || 50,
     });
   } catch (e: unknown) {
     sendStellarError(res, e, { wallet: walletAddress, operation: "quote" });
@@ -1094,7 +1122,7 @@ router.post("/stellar/mint-test-tokens", async (req, res): Promise<void> => {
     prepared.sign(deployer);
     const sent = await server.sendTransaction(prepared);
     if (sent.status === "ERROR") {
-      res.status(422).json({ error: sent.errorResultXdr || "Mint transaction failed" });
+      res.status(422).json({ error: sent.errorResult?.toXDR("base64") ?? "Mint transaction failed" });
       return;
     }
 
@@ -1315,8 +1343,8 @@ async function poolToken0ForPool(
     .build();
   const sim = await server.simulateTransaction(tx);
   if (StellarSdk.rpc.Api.isSimulationError(sim)) throw new Error(String(sim.error));
-  const hex = Buffer.from(sim.result!.retval!.address().contractId()).toString("hex");
-  return StellarSdk.StrKey.encodeContract(Buffer.from(hex, "hex"));
+  const contractIdBytes = sim.result!.retval!.address().contractId() as unknown as Uint8Array;
+  return StellarSdk.StrKey.encodeContract(Buffer.from(contractIdBytes));
 }
 
 // ---------------------------------------------------------------------------
@@ -1523,6 +1551,40 @@ router.get("/stellar/farm-positions", async (req, res): Promise<void> => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/stellar/user-positions?wallet= — full LP + farm breakdown per pool
+// Returns only pools where the wallet has any liquidity (staked or unstaked).
+// Fields: token0Amount, token1Amount, userValueUsd, lpBalance, stakedBalance,
+//         aprPercent, rewardsEarnedUsd, pendingRewardsHuman
+// ---------------------------------------------------------------------------
+router.get("/stellar/user-positions", async (req, res): Promise<void> => {
+  const { wallet } = req.query;
+  if (!wallet || typeof wallet !== "string") {
+    res.status(400).json({ error: "wallet required" });
+    return;
+  }
+
+  try {
+    requireContracts();
+  } catch (e: unknown) {
+    res.status(503).json({ error: String(e) });
+    return;
+  }
+
+  try {
+    const pools = await listOnChainFarmPools(wallet);
+    // Only return pools where the user actually has something
+    const positions = pools.filter(
+      (p) =>
+        (p.lpLiquidity && p.lpLiquidity !== "0") ||
+        (p.stakedLiquidity && p.stakedLiquidity !== "0"),
+    );
+    res.json(positions);
+  } catch (e: unknown) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/stellar/create-pool — deploy a new pool via the factory contract
 // ---------------------------------------------------------------------------
 router.post("/stellar/create-pool", async (req, res): Promise<void> => {
@@ -1569,7 +1631,7 @@ router.post("/stellar/create-pool", async (req, res): Promise<void> => {
     const server = rpcServer(StellarSdk);
     const account = await server.getAccount(walletAddress);
     const factory = new StellarSdk.Contract(config.factory);
-    const feeTierVal = feeTierScVal(StellarSdk, String(feeTier));
+    const feeTierVal = feeTierScVal(StellarSdk, String(feeTier) as "Low" | "Medium" | "High");
 
     const tx = new StellarSdk.TransactionBuilder(account, {
       fee: "1000000",
