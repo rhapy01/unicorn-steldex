@@ -92,6 +92,66 @@ export function liquidityFromAmount1(sqrtA: bigint, sqrtB: bigint, amount1: bigi
   return (amount1 * Q32) / delta;
 }
 
+/**
+ * How much of token0 is owned by `liquidity` units between sqrtPrice and sqrtPb.
+ * Use sqrtPrice = current pool price, sqrtPb = upper bound.
+ */
+export function amount0FromLiquidity(
+  sqrtPrice: bigint,
+  sqrtPb: bigint,
+  liquidity: bigint,
+): bigint {
+  if (liquidity === 0n || sqrtPrice <= 0n || sqrtPb <= 0n) return 0n;
+  const lo = sqrtPrice < sqrtPb ? sqrtPrice : sqrtPb;
+  const hi = sqrtPrice < sqrtPb ? sqrtPb : sqrtPrice;
+  // amount0 = liquidity * (hi - lo) / (lo * hi / Q32)
+  const denom = (lo * hi) / Q32;
+  if (denom === 0n) return 0n;
+  return (liquidity * (hi - lo)) / denom;
+}
+
+/**
+ * How much of token1 is owned by `liquidity` units between sqrtPa and sqrtPrice.
+ * Use sqrtPa = lower bound, sqrtPrice = current pool price.
+ */
+export function amount1FromLiquidity(
+  sqrtPa: bigint,
+  sqrtPrice: bigint,
+  liquidity: bigint,
+): bigint {
+  if (liquidity === 0n) return 0n;
+  const lo = sqrtPa < sqrtPrice ? sqrtPa : sqrtPrice;
+  const hi = sqrtPa < sqrtPrice ? sqrtPrice : sqrtPa;
+  // amount1 = liquidity * (hi - lo) / Q32
+  return (liquidity * (hi - lo)) / Q32;
+}
+
+/**
+ * Compute token0 and token1 amounts for a liquidity position.
+ * Handles all three cases: price below range, in range, above range.
+ */
+export function liquidityToAmounts(
+  sqrtPrice: bigint,
+  sqrtPa: bigint,
+  sqrtPb: bigint,
+  liquidity: bigint,
+): { amount0: bigint; amount1: bigint } {
+  if (liquidity === 0n) return { amount0: 0n, amount1: 0n };
+  if (sqrtPrice <= sqrtPa) {
+    // Price below range: position is 100% token0
+    return { amount0: amount0FromLiquidity(sqrtPa, sqrtPb, liquidity), amount1: 0n };
+  }
+  if (sqrtPrice >= sqrtPb) {
+    // Price above range: position is 100% token1
+    return { amount0: 0n, amount1: amount1FromLiquidity(sqrtPa, sqrtPb, liquidity) };
+  }
+  // Price in range
+  return {
+    amount0: amount0FromLiquidity(sqrtPrice, sqrtPb, liquidity),
+    amount1: amount1FromLiquidity(sqrtPa, sqrtPrice, liquidity),
+  };
+}
+
 export function computeLiquidity(
   sqrtPrice: bigint,
   sqrtPa: bigint,
