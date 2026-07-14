@@ -11,7 +11,7 @@ export function toI128String(value: string | undefined): bigint {
 export function sendStellarError(
   res: Response,
   err: unknown,
-  ctx?: { wallet?: string; operation?: "swap" | "quote" | "liquidity" },
+  ctx?: { wallet?: string; operation?: "swap" | "quote" | "liquidity" | "limit-order" | "cancel-order" | "create-pool" },
 ): void {
   const raw = err instanceof Error ? err.message : String(err);
 
