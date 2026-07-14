@@ -8,7 +8,7 @@ describe("GET /api/stellar/events", () => {
       .get("/api/stellar/events")
       .buffer(true)
       .parse((res, cb) => {
-        const stream = res as import("node:http").IncomingMessage & { destroy?: () => void };
+        const stream = res as unknown as import("node:http").IncomingMessage & { destroy?: () => void };
         let data = "";
         stream.on("data", (chunk: Buffer) => {
           data += chunk.toString();
