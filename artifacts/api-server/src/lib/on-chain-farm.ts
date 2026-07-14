@@ -2,6 +2,9 @@ import type { xdr } from "@stellar/stellar-sdk";
 import { getContractConfig } from "./contract-config.js";
 import { listOnChainPools } from "./on-chain-pools.js";
 import { fullRangeTicks } from "./pool-ticks.js";
+import { tickToSqrtQ32, liquidityToAmounts } from "./clmm-math.js";
+import { decimalsForContract } from "./token-decimals.js";
+import { buildOnChainCatalog } from "./market-catalog.js";
 
 type StellarSdk = typeof import("@stellar/stellar-sdk");
 type RpcServer = InstanceType<StellarSdk["rpc"]["Server"]>;
@@ -74,7 +77,16 @@ export type FarmPoolState = {
   weeklyStellar: string;
   weeklyStellarHuman: number;
   totalStaked: string;
-  baseAprPercent: number;
+  aprPercent: number;
+  aprDataReliable: boolean;
+};
+
+/** Human-readable breakdown of a liquidity balance (staked or unstaked). */
+export type LpBalanceInfo = {
+  liquidity: string;
+  token0Amount: number;
+  token1Amount: number;
+  valueUsd: number;
 };
 
 export type FarmStakeInfo = {
@@ -83,6 +95,7 @@ export type FarmStakeInfo = {
   lockWeeks: number;
   pendingRewards: string;
   pendingRewardsHuman: number;
+  pendingRewardsUsd: number;
   autoCompound: boolean;
   stakedAt: number;
   boostMultiplier: number;
@@ -93,11 +106,20 @@ export type FarmPoolRow = {
   pair: string;
   token0Symbol: string;
   token1Symbol: string;
+  token0Contract: string;
+  token1Contract: string;
   tvlUsd: number;
   farm: FarmPoolState;
+  // Raw liquidity strings (internal units)
   lpLiquidity?: string;
   stakedLiquidity?: string;
   availableToStake?: string;
+  // Human-readable breakdowns (wallet-gated)
+  lpBalance?: LpBalanceInfo;       // unstaked portion
+  stakedBalance?: LpBalanceInfo;   // staked in farm
+  userValueUsd?: number;           // lpBalance.valueUsd + stakedBalance.valueUsd
+  rewardsEarnedUsd?: number;       // pending rewards converted to USD
+  pendingRewardsHuman?: number;
 };
 
 export type FarmPosition = {
@@ -105,10 +127,14 @@ export type FarmPosition = {
   pair: string;
   token0Symbol: string;
   token1Symbol: string;
+  token0Contract: string;
+  token1Contract: string;
   tickLower: number;
   tickUpper: number;
   stake: FarmStakeInfo;
   pendingRewardsHuman: number;
+  rewardsEarnedUsd: number;
+  stakedBalance: LpBalanceInfo;
 };
 
 export type FarmOverview = {
@@ -119,19 +145,37 @@ export type FarmOverview = {
   userPendingRewards?: number;
 };
 
-function parsePoolFarmState(sdk: StellarSdk, val: ScVal): FarmPoolState {
+function parsePoolFarmState(sdk: StellarSdk, val: ScVal, tvlUsd?: number): FarmPoolState {
   const weekly = scMapField(sdk, val, "weekly_stellar");
   const totalStaked = scMapField(sdk, val, "total_staked");
   const weeklyHuman = toStellarHuman(weekly);
-  const baseAprPercent =
-    totalStaked > 0n
-      ? (Number(weekly) / Number(totalStaked)) * 52 * 100
-      : 0;
+
+  // Get STELLAR price from the catalog
+  const catalog = buildOnChainCatalog();
+  const stellarToken = catalog.tokens.find((t) => t.symbol === "STELLAR");
+  const stellarPrice = stellarToken?.price ?? 0;
+
+  // Correct APR: normalize to USD before comparing
+  // APR = (weeklyRewardsUsd / totalStakedUsd) * 52 weeks * 100%
+  // tvlUsd is the total pool TVL (used as proxy for totalStakedUsd when available)
+  let aprPercent = 0;
+  let aprDataReliable = false;
+  const weeklyUsd = weeklyHuman * stellarPrice;
+  const stakedUsd = (tvlUsd && tvlUsd > 0) ? tvlUsd : 0;
+
+  if (stakedUsd > 0 && weeklyUsd >= 0 && stellarPrice > 0) {
+    const raw = (weeklyUsd / stakedUsd) * 52 * 100;
+    // Sanity cap: anything above 99,900% is clearly bad data
+    aprPercent = raw > 99_900 ? 0 : raw;
+    aprDataReliable = raw <= 99_900;
+  }
+
   return {
     weeklyStellar: weekly.toString(),
     weeklyStellarHuman: weeklyHuman,
     totalStaked: totalStaked.toString(),
-    baseAprPercent,
+    aprPercent: Math.round(aprPercent * 100) / 100, // round to 2dp
+    aprDataReliable,
   };
 }
 
@@ -141,12 +185,19 @@ function parseStakeInfo(sdk: StellarSdk, val: ScVal): FarmStakeInfo | null {
   if (liquidity === 0n) return null;
   const lockWeeks = scMapU32(sdk, val, "lock_weeks");
   const pending = scMapField(sdk, val, "pending_rewards");
+
+  const catalog = buildOnChainCatalog();
+  const stellarToken = catalog.tokens.find((t) => t.symbol === "STELLAR");
+  const stellarPrice = stellarToken?.price ?? 0;
+  const pendingHuman = toStellarHuman(pending);
+
   return {
     liquidity: liquidity.toString(),
     lockEndLedger: scMapU32(sdk, val, "lock_end_ledger"),
     lockWeeks,
     pendingRewards: pending.toString(),
-    pendingRewardsHuman: toStellarHuman(pending),
+    pendingRewardsHuman: pendingHuman,
+    pendingRewardsUsd: pendingHuman * stellarPrice,
     autoCompound: scMapBool(val, "auto_compound"),
     stakedAt: Number(scMapField(sdk, val, "staked_at")),
     boostMultiplier: boostMultiplier(lockWeeks),
@@ -188,14 +239,15 @@ async function readPoolPositionLiquidity(
   return 0n;
 }
 
-export async function readFarmPoolState(poolContract: string): Promise<FarmPoolState> {
+export async function readFarmPoolState(poolContract: string, tvlUsd?: number): Promise<FarmPoolState> {
   const config = getContractConfig();
   if (!config.farm) {
     return {
       weeklyStellar: "0",
       weeklyStellarHuman: 0,
       totalStaked: "0",
-      baseAprPercent: 0,
+      aprPercent: 0,
+      aprDataReliable: false,
     };
   }
   const sdk = await stellar();
@@ -208,10 +260,11 @@ export async function readFarmPoolState(poolContract: string): Promise<FarmPoolS
       weeklyStellar: "0",
       weeklyStellarHuman: 0,
       totalStaked: "0",
-      baseAprPercent: 0,
+      aprPercent: 0,
+      aprDataReliable: false,
     };
   }
-  return parsePoolFarmState(sdk, val);
+  return parsePoolFarmState(sdk, val, tvlUsd);
 }
 
 export async function readFarmStake(
@@ -254,36 +307,131 @@ export async function readPendingRewards(
   return toStellarHuman(sdk.scValToBigInt(val));
 }
 
+/** Compute human-readable token amounts and USD value for a liquidity amount. */
+function buildLpBalanceInfo(
+  liquidity: bigint,
+  sqrtPrice: bigint,
+  sqrtPa: bigint,
+  sqrtPb: bigint,
+  token0Decimals: number,
+  token1Decimals: number,
+  token0PriceUsd: number,
+  token1PriceUsd: number,
+): LpBalanceInfo {
+  if (liquidity === 0n) {
+    return { liquidity: "0", token0Amount: 0, token1Amount: 0, valueUsd: 0 };
+  }
+  const { amount0, amount1 } = liquidityToAmounts(sqrtPrice, sqrtPa, sqrtPb, liquidity);
+  const token0Amount = Number(amount0) / 10 ** token0Decimals;
+  const token1Amount = Number(amount1) / 10 ** token1Decimals;
+  const valueUsd = token0Amount * token0PriceUsd + token1Amount * token1PriceUsd;
+  return {
+    liquidity: liquidity.toString(),
+    token0Amount,
+    token1Amount,
+    valueUsd,
+  };
+}
+
 export async function listOnChainFarmPools(walletAddress?: string): Promise<FarmPoolRow[]> {
   const pools = await listOnChainPools();
   const { tickLower, tickUpper } = fullRangeTicks();
   const sdk = await stellar();
   const server = new sdk.rpc.Server(RPC);
+  const sqrtPa = tickToSqrtQ32(tickLower);
+  const sqrtPb = tickToSqrtQ32(tickUpper);
+
+  // Build token price map from catalog
+  const catalog = buildOnChainCatalog();
+  const priceBySymbol: Record<string, number> = {};
+  const priceByContract: Record<string, number> = {};
+  for (const t of catalog.tokens) {
+    priceBySymbol[t.symbol] = t.price;
+    if (t.contractAddress) priceByContract[t.contractAddress] = t.price;
+  }
+  const stellarPrice = priceBySymbol["STELLAR"] ?? 0;
+  const config = getContractConfig();
 
   const rows = await Promise.all(
     pools.map(async (p) => {
       if (!p.poolContract || !p.pair) return null;
-      const [symA, symB] = p.pair.split("/");
-      const farm = await readFarmPoolState(p.poolContract);
+
+      // Get pool token contracts from the registry (already in CatalogPool via tokenA/tokenB)
+      const token0Contract = p.tokenA.contractAddress ?? "";
+      const token1Contract = p.tokenB.contractAddress ?? "";
+      const token0Symbol = p.tokenA.symbol;
+      const token1Symbol = p.tokenB.symbol;
+      const token0PriceUsd = p.tokenA.price;
+      const token1PriceUsd = p.tokenB.price;
+      const token0Decimals = decimalsForContract(token0Contract, config);
+      const token1Decimals = decimalsForContract(token1Contract, config);
+
+      const farm = await readFarmPoolState(p.poolContract, p.totalLiquidity);
+
       const row: FarmPoolRow = {
         poolContract: p.poolContract,
         pair: p.pair,
-        token0Symbol: symA,
-        token1Symbol: symB,
+        token0Symbol,
+        token1Symbol,
+        token0Contract,
+        token1Contract,
         tvlUsd: p.totalLiquidity,
         farm,
       };
 
       if (walletAddress) {
+        // Fetch sqrt price, LP position and stake in parallel
+        let sqrtPrice: bigint;
+        try {
+          const source = await server.getAccount(SIM_SOURCE);
+          const poolC = new sdk.Contract(p.poolContract);
+          const tx = new sdk.TransactionBuilder(source, {
+            fee: "100000",
+            networkPassphrase: TESTNET_PASSPHRASE,
+          })
+            .addOperation(poolC.call("sqrt_price"))
+            .setTimeout(30)
+            .build();
+          const sim = await server.simulateTransaction(tx);
+          sqrtPrice =
+            !sdk.rpc.Api.isSimulationError(sim) && sim.result?.retval
+              ? sdk.scValToBigInt(sim.result.retval)
+              : tickToSqrtQ32(0);
+        } catch {
+          sqrtPrice = tickToSqrtQ32(0);
+        }
+
         const [lpLiq, stake] = await Promise.all([
           readPoolPositionLiquidity(sdk, server, p.poolContract, walletAddress, tickLower, tickUpper),
           readFarmStake(walletAddress, p.poolContract, tickLower, tickUpper),
         ]);
+
         const staked = stake ? BigInt(stake.liquidity) : 0n;
         const available = lpLiq > staked ? lpLiq - staked : 0n;
+
         row.lpLiquidity = lpLiq.toString();
         row.stakedLiquidity = staked.toString();
         row.availableToStake = available.toString();
+
+        // Human-readable breakdowns
+        row.lpBalance = buildLpBalanceInfo(
+          available, sqrtPrice, sqrtPa, sqrtPb,
+          token0Decimals, token1Decimals, token0PriceUsd, token1PriceUsd,
+        );
+        row.stakedBalance = buildLpBalanceInfo(
+          staked, sqrtPrice, sqrtPa, sqrtPb,
+          token0Decimals, token1Decimals, token0PriceUsd, token1PriceUsd,
+        );
+        row.userValueUsd = row.lpBalance.valueUsd + row.stakedBalance.valueUsd;
+
+        // Pending rewards in USD
+        if (stake) {
+          row.pendingRewardsHuman = stake.pendingRewardsHuman;
+          row.rewardsEarnedUsd = stake.pendingRewardsHuman * stellarPrice;
+        } else {
+          row.pendingRewardsHuman = 0;
+          row.rewardsEarnedUsd = 0;
+        }
       }
 
       return row;
@@ -296,28 +444,77 @@ export async function listOnChainFarmPools(walletAddress?: string): Promise<Farm
 export async function getOnChainFarmPositions(walletAddress: string): Promise<FarmPosition[]> {
   const pools = await listOnChainPools();
   const { tickLower, tickUpper } = fullRangeTicks();
+  const sdk = await stellar();
+  const server = new sdk.rpc.Server(RPC);
+  const sqrtPa = tickToSqrtQ32(tickLower);
+  const sqrtPb = tickToSqrtQ32(tickUpper);
+
+  const catalog = buildOnChainCatalog();
+  const priceBySymbol: Record<string, number> = {};
+  for (const t of catalog.tokens) priceBySymbol[t.symbol] = t.price;
+  const stellarPrice = priceBySymbol["STELLAR"] ?? 0;
+  const config = getContractConfig();
 
   const positions = await Promise.all(
     pools.map(async (p) => {
       if (!p.poolContract || !p.pair) return null;
       const stake = await readFarmStake(walletAddress, p.poolContract, tickLower, tickUpper);
       if (!stake) return null;
+
       const pendingRewardsHuman = await readPendingRewards(
         walletAddress,
         p.poolContract,
         tickLower,
         tickUpper,
       );
-      const [symA, symB] = p.pair.split("/");
+
+      const token0Contract = p.tokenA.contractAddress ?? "";
+      const token1Contract = p.tokenB.contractAddress ?? "";
+      const token0Decimals = decimalsForContract(token0Contract, config);
+      const token1Decimals = decimalsForContract(token1Contract, config);
+      const token0PriceUsd = p.tokenA.price;
+      const token1PriceUsd = p.tokenB.price;
+
+      // Fetch sqrt price for token amount computation
+      let sqrtPrice: bigint;
+      try {
+        const source = await server.getAccount(SIM_SOURCE);
+        const poolC = new sdk.Contract(p.poolContract);
+        const tx = new sdk.TransactionBuilder(source, {
+          fee: "100000",
+          networkPassphrase: TESTNET_PASSPHRASE,
+        })
+          .addOperation(poolC.call("sqrt_price"))
+          .setTimeout(30)
+          .build();
+        const sim = await server.simulateTransaction(tx);
+        sqrtPrice =
+          !sdk.rpc.Api.isSimulationError(sim) && sim.result?.retval
+            ? sdk.scValToBigInt(sim.result.retval)
+            : tickToSqrtQ32(0);
+      } catch {
+        sqrtPrice = tickToSqrtQ32(0);
+      }
+
+      const stakedBalance = buildLpBalanceInfo(
+        BigInt(stake.liquidity),
+        sqrtPrice, sqrtPa, sqrtPb,
+        token0Decimals, token1Decimals, token0PriceUsd, token1PriceUsd,
+      );
+
       return {
         poolContract: p.poolContract,
         pair: p.pair,
-        token0Symbol: symA,
-        token1Symbol: symB,
+        token0Symbol: p.tokenA.symbol,
+        token1Symbol: p.tokenB.symbol,
+        token0Contract,
+        token1Contract,
         tickLower,
         tickUpper,
         stake,
         pendingRewardsHuman,
+        rewardsEarnedUsd: pendingRewardsHuman * stellarPrice,
+        stakedBalance,
       } satisfies FarmPosition;
     }),
   );
