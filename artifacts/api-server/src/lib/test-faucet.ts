@@ -33,7 +33,7 @@ export async function mintTestUsdc(
   prepared.sign(deployer);
   const sent = await server.sendTransaction(prepared);
   if (sent.status === "ERROR" || !sent.hash) {
-    throw new Error(sent.errorResultXdr || "USDC mint failed");
+    throw new Error(sent.errorResult?.toXDR("base64") ?? "USDC mint failed");
   }
 
   for (let i = 0; i < 30; i++) {

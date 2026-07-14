@@ -56,8 +56,8 @@ function scMapAddressStr(sdk: StellarSdk, val: ScVal, key: string): string | nul
     const addr = e.val().address();
     switch (addr.switch().name) {
       case "scAddressTypeContract": {
-        const hex = Buffer.from(addr.contractId()).toString("hex");
-        return sdk.StrKey.encodeContract(Buffer.from(hex, "hex"));
+        const contractIdBytes = addr.contractId() as unknown as Uint8Array;
+        return sdk.StrKey.encodeContract(Buffer.from(contractIdBytes));
       }
       case "scAddressTypeAccount": {
         const ed = addr.accountId().ed25519();

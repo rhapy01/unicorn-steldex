@@ -1,9 +1,11 @@
 import type { ContractConfig } from "./contract-config.js";
+import type { xdr } from "@stellar/stellar-sdk";
 import { feeTierScVal } from "./soroban-scval.js";
 import { symbolForContract } from "./swap-route.js";
 
 type StellarSdk = typeof import("@stellar/stellar-sdk");
 type RpcServer = InstanceType<StellarSdk["rpc"]["Server"]>;
+type ScVal = xdr.ScVal;
 
 const SIM_SOURCE = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7";
 const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
@@ -29,8 +31,8 @@ async function simulateContract(
   server: RpcServer,
   contractId: string,
   fn: string,
-  ...args: StellarSdk["xdr"]["ScVal"][]
-): Promise<unknown> {
+  ...args: ScVal[]
+): Promise<ScVal | undefined> {
   const contract = new StellarSdk.Contract(contractId);
   const source = await server.getAccount(SIM_SOURCE);
   const tx = new StellarSdk.TransactionBuilder(source, {
@@ -44,14 +46,13 @@ async function simulateContract(
   if (StellarSdk.rpc.Api.isSimulationError(sim)) {
     throw new Error(typeof sim.error === "string" ? sim.error : JSON.stringify(sim));
   }
-  return sim.result?.retval;
+  return sim.result?.retval as ScVal | undefined;
 }
 
-function scAddressToStr(StellarSdk: StellarSdk, val: unknown): string {
-  const sc = val as StellarSdk["xdr"]["ScVal"];
-  const addr = sc.address();
-  const hex = Buffer.from(addr.contractId()).toString("hex");
-  return StellarSdk.StrKey.encodeContract(Buffer.from(hex, "hex"));
+function scAddressToStr(StellarSdk: StellarSdk, val: ScVal): string {
+  const addr = val.address();
+  const contractIdBytes = addr.contractId() as unknown as Uint8Array;
+  return StellarSdk.StrKey.encodeContract(Buffer.from(contractIdBytes));
 }
 
 function poolsFromEnv(config: ContractConfig): OnChainPool[] {
@@ -92,8 +93,8 @@ export async function listFactoryPools(
   if (config.factory) {
   const retval = await simulateContract(StellarSdk, server, config.factory, "all_pools");
 
-  if (retval && (retval as StellarSdk["xdr"]["ScVal"]).switch().name === "scvVec") {
-    const vec = (retval as StellarSdk["xdr"]["ScVal"]).vec() ?? [];
+  if (retval && retval.switch().name === "scvVec") {
+    const vec = retval.vec() ?? [];
     for (const entry of vec) {
       const map = entry.map() ?? [];
       let address = "";
@@ -165,7 +166,7 @@ export async function resolvePoolForTokens(
     new StellarSdk.Address(tokenB).toScVal(),
     feeTierScVal(StellarSdk, "Medium"),
   );
-  if (!retval || (retval as StellarSdk["xdr"]["ScVal"]).switch().name === "scvVoid") return null;
+  if (!retval || retval.switch().name === "scvVoid") return null;
   const address = scAddressToStr(StellarSdk, retval);
   const [token0, token1] = tokenA < tokenB ? [tokenA, tokenB] : [tokenB, tokenA];
   return {
